@@ -65,35 +65,57 @@ module Excel =
         let worksheet = (workbookPart.GetPartById(sheet.Id.Value) :?> WorksheetPart').Worksheet
         let rows = worksheet.Descendants<Row'>() |> Array.ofSeq
         let cols = worksheet.Descendants<Column'>() |> Array.ofSeq
+        let upperLeft, lowerRight, cells = 
+            let cells : Map<CellIndex, Cell'> ref = ref Map.empty
+            rows
+            |> Array.map (fun row -> 
+                row.Elements<Cell'>()                
+                |> Seq.filter (fun cell -> isNotNull cell)
+                |> Seq.map (fun cell -> (convertLabel cell.CellReference.Value), cell)
+                |> Array.ofSeq)
+            |> Array.concat  // unique cell indices
+            |> fun cells' ->
+                if cells'.Length = 0 then Index(0,0), Index(0,0), !cells 
+                else
+                    let upperLeft', lowerRight' = ref (fst cells'.[0]), ref (fst cells'.[0])
+                    cells'
+                    |> Array.iter (fun ((i,j), c) ->
+                        upperLeft'  := (min (fst !upperLeft')  i), (min (snd !upperLeft')  j)
+                        lowerRight' := (max (fst !lowerRight') i), (max (snd !lowerRight') j)
+                        cells := (!cells).Add (Index(i,j), c)
+                    )
+                    Index(!upperLeft'), Index(!lowerRight'), !cells
 
         let cellFormats = 
             workbookPart.WorkbookStylesPart.Stylesheet.CellFormats.Descendants<CellFormat'>() |> Array.ofSeq
-        let numberingFormats = 
-            workbookPart.WorkbookStylesPart.Stylesheet.NumberingFormats.Descendants<NumberingFormat'>() |> Array.ofSeq
-        let dateTimeFormats = 
-            numberingFormats 
-            |> Array.filter (fun x -> x.FormatCode.Value |> isDateTime)
-            |> Array.map (fun x -> x.NumberFormatId.Value)
-            |> Array.append builtInDateTimeNumberFormatIDs
-        let cellDateTimeFormats = 
+
+        let mutable cellDateTimeFormats = 
             cellFormats   
             |> Array.mapi (fun i x -> 
-                dateTimeFormats 
+                workbookPart.WorkbookStylesPart.Stylesheet.NumberingFormats.Descendants<NumberingFormat'>() 
+                |> Array.ofSeq
+                |> Array.filter (fun x -> x.FormatCode.Value |> isDateTime)
+                |> Array.map (fun x -> x.NumberFormatId.Value)
+                |> Array.append builtInDateTimeNumberFormatIDs 
                 |> Array.map (fun y -> y = x.NumberFormatId.Value) 
                 |> Array.fold (fun x' y' -> x' || y') false, i, x)
             |> Array.filter (fun (b, _,_) -> b)
             |> Array.map (fun (_, i, x) -> i, x.NumberFormatId.Value)
             |> Map.ofArray
 
-        member x.Rows = worksheet.Descendants<Row'>() |> Array.ofSeq
-        member x.Cols = worksheet.Descendants<Column'>() |> Array.ofSeq
+        member x.Rows = rows
+        member x.Cols = cols
 
-        member x.UpperLeft  = rows.[0].Elements<Cell'>() |> Seq.head |> fun x -> x.LocalName
-        member x.LowerRight = cols.[cols.Length-1].LocalName + rows.[rows.Length-1].LocalName
+        member x.UpperLeft = upperLeft
+        member x.LowerRight = lowerRight
 
         member x.Values() : CellContent [,] = 
             // https://stackoverflow.com/questions/19034805/how-to-distinguish-inline-numbers-from-ole-automation-date-numbers-in-openxml-sp/19582685
-            let values = array2D [| for i in [0 ..50] do yield [ for j in [0 .. 50] do yield CellContent.Empty ] |]
+            let values = 
+                let a,a' = match lowerRight with | Index(i,j) -> i,j | Label x -> x |> convertLabel 
+                let b,b' = match upperLeft  with | Index(i,j) -> i,j | Label x -> x |> convertLabel 
+                array2D [| for i in [0 ..(a-b)] do 
+                                yield [ for j in [0 .. (a'-b')] do yield CellContent.Empty ] |]
             rows
             |> Array.iteri (fun i row -> 
                     row.Elements<Cell'>() 
@@ -133,57 +155,7 @@ module Excel =
         member x.Cells (a, b) = ()
         member x.Cells (rangeObj: obj) = ()
         member x.Cells (rangeName: string) = ()
-    
 
- // http://stackoverflow.com/questions/19034805/how-to-distinguish-inline-numbers-from-ole-automation-date-numbers-in-openxml-sp/19582685#19582685
- (*
- public class ExcelHelper
-{
-    static uint[] builtInDateTimeNumberFormatIDs = new uint[] { 14, 15, 16, 17, 18, 19, 20, 21, 22, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 45, 46, 47, 50, 51, 52, 53, 54, 55, 56, 57, 58 };
-    static Dictionary<uint, NumberingFormat> builtInDateTimeNumberFormats = builtInDateTimeNumberFormatIDs.ToDictionary(id => id, id => new NumberingFormat { NumberFormatId = id });
-    static Regex dateTimeFormatRegex = new Regex(@"((?=([^[]*\[[^[\]]*\])*([^[]*[ymdhs]+[^\]]*))|.*\[(h|mm|ss)\].*)", RegexOptions.Compiled);
-
-    public static Dictionary<uint, NumberingFormat> GetDateTimeCellFormats(WorkbookPart workbookPart)
-    {
-        var dateNumberFormats = workbookPart.WorkbookStylesPart.Stylesheet.NumberingFormats
-            .Descendants<NumberingFormat>()
-            .Where(nf => dateTimeFormatRegex.Match(nf.FormatCode.Value).Success)
-            .ToDictionary(nf => nf.NumberFormatId.Value);
-
-        var cellFormats = workbookPart.WorkbookStylesPart.Stylesheet.CellFormats
-            .Descendants<CellFormat>();
-
-        var dateCellFormats = new Dictionary<uint, NumberingFormat>();
-        uint styleIndex = 0;
-        foreach (var cellFormat in cellFormats)
-        {
-            if (cellFormat.ApplyNumberFormat != null && cellFormat.ApplyNumberFormat.Value)
-            {
-                if (dateNumberFormats.ContainsKey(cellFormat.NumberFormatId.Value))
-                {
-                    dateCellFormats.Add(styleIndex, dateNumberFormats[cellFormat.NumberFormatId.Value]);
-                }
-                else if (builtInDateTimeNumberFormats.ContainsKey(cellFormat.NumberFormatId.Value))
-                {
-                    dateCellFormats.Add(styleIndex, builtInDateTimeNumberFormats[cellFormat.NumberFormatId.Value]);
-                }
-            }
-
-            styleIndex++;
-        }
-
-        return dateCellFormats;
-    }
-
-    // Usage Example
-    public static bool IsDateTimeCell(WorkbookPart workbookPart, Cell cell)
-    {
-        if (cell.StyleIndex == null)
-            return false;
-
-        var dateTimeCellFormats = ExcelHelper.GetDateTimeCellFormats(workbookPart);
-
-        return dateTimeCellFormats.ContainsKey(cell.StyleIndex);
-    }
-}
-*)
+        member x.CellDateTimeFormats 
+            with get() = cellDateTimeFormats
+            and set(dict) = cellDateTimeFormats <- dict

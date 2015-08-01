@@ -48,7 +48,7 @@ module Excel =
             tuple2 (many1Satisfy  isLetter) (many1Satisfy  isDigit)
             |> fun x -> run x (label.ToUpper())
             |> function
-            | Success (x, _, _) ->  ( ColumnIndex (fst x), System.Int32.Parse(snd x) - 1)
+            | Success (x, _, _) ->  System.Int32.Parse(snd x) - 1, ColumnIndex (fst x)
             | _ -> failwith (sprintf "Invalid CellIndex '%s'" label)
 
 

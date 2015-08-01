@@ -10,6 +10,7 @@
 open Pollux.Excel
 
 let sheet = Sheet (@"..\..\..\Desktop\Cost Summary2.xlsx", "Übersicht", false)
-
+sheet.UpperLeft
+sheet.LowerRight
 sheet.Values()
 |> Array2D.iteri (fun i j x -> if x <> CellContent.Empty then printfn "%s %A" (Utils.convertIndex i j) x)
