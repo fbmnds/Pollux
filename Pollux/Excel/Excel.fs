@@ -1,8 +1,6 @@
 ﻿namespace Pollux
 
-module Excel =
-
-    open Pollux.Excel.Utils
+namespace Pollux.Excel
 
     type private SpreadsheetDocument'   = DocumentFormat.OpenXml.Packaging.SpreadsheetDocument
     type private WorkbookPart'          = DocumentFormat.OpenXml.Packaging.WorkbookPart
@@ -42,18 +40,86 @@ module Excel =
           UpperLeft    : Index
           LowerRight   : Index
           Values       : CellContent [,] }
+    and DecimalRange = 
+        { mutable Name : string 
+          UpperLeft    : Index
+          LowerRight   : Index
+          Values       : decimal [,] }
+    and StringRange = 
+        { mutable Name : string 
+          UpperLeft    : Index
+          LowerRight   : Index
+          Values       : string [,] }
 
 
-    let ConvertCellIndex = function
-    | Label label -> Index (convertLabel label)
-    | Index (x,y) -> Label (convertIndex x y)
+    type RangeWithCheckSumsRow (range : DecimalRange) =
+        do
+            if range.Values.GetUpperBound(0) < 1 then 
+                raise (System.ArgumentOutOfRangeException ("CheckSum range row dimension error"))
+
+        let checkSums : decimal [] =
+            [| for col in [0 .. range.Values.GetUpperBound(1)] do
+                   yield [| for row in [0 .. range.Values.GetUpperBound(0) - 1] do 
+                                yield range.Values.[row,col] |] |> Array.reduce (+) |]
+        let checkResults : bool [] =
+            [| for col in [0 .. range.Values.GetUpperBound(1)] do 
+                   yield range.Values.[range.Values.GetUpperBound(0),col] |]
+            |> Array.zip checkSums
+            |> Array.map (fun (x,y) -> x = y)
+        let checkErrors : CellIndex [] = 
+            checkResults
+            |> Array.mapi (fun i x -> i,x)
+            |> Array.filter (fun (i,x) -> x)
+            |> Array.mapi (fun j (i,x) -> Label(convertIndex i j))
+        
+        member x.CheckSums = checkSums
+        member x.CheckResults = checkResults
+        member x.CheckErrors = checkErrors
 
 
-    type Sheet (fileName : string, sheetName: string, editable: bool) =
+    type RangeWithCheckSumsCol (range : DecimalRange) =
+        do
+            if range.Values.GetUpperBound(1) < 1 then 
+                raise (System.ArgumentOutOfRangeException ("CheckSum range column dimension error"))
+
+        let checkSums : decimal [] =
+            [| for row in [0 .. range.Values.GetUpperBound(0)] do
+                   yield [| for col in [0 .. range.Values.GetUpperBound(1) - 1] do 
+                                yield range.Values.[row,col] |] |> Array.reduce (+) |]
+        let checkResults : bool [] =
+            [| for row in [0 .. range.Values.GetUpperBound(0)] do 
+                   yield range.Values.[row, range.Values.GetUpperBound(1)] |]
+            |> Array.zip checkSums
+            |> Array.map (fun (x,y) -> x = y)
+        let checkErrors : CellIndex [] = 
+            checkResults
+            |> Array.mapi (fun i x -> i,x)
+            |> Array.filter (fun (i,x) -> x)
+            |> Array.mapi (fun j (i,x) -> Label(convertIndex i j))
+        
+        member x.CheckSums = checkSums
+        member x.CheckResults = checkResults
+        member x.CheckErrors = checkErrors
+
+
+    type Workbook (fileName : string, editable: bool) =
+        
         let fileFullName = FileFullName(fileName).Value
-        let sheetName = sheetName
+        let sheetDocument = SpreadsheetDocument'.Open(fileFullName, editable)
 
-        let workbookPart = SpreadsheetDocument'.Open(fileFullName, editable).WorkbookPart
+        let workbookPart = sheetDocument.WorkbookPart
+
+        member x.WorkbookPart = workbookPart
+        member x.FileFullName = fileFullName
+
+        interface System.IDisposable with 
+            member x.Dispose() = sheetDocument.Dispose()
+      
+
+    type Sheet (workbook : Workbook, sheetName: string, editable: bool) =
+        let sheetName = sheetName
+        
+        let workbookPart = workbook.WorkbookPart
         let sheet =
             workbookPart.Workbook.Descendants<Sheet'>()
             |> Seq.filter (fun sheet -> sheet.Name.InnerText = sheetName)
@@ -82,8 +148,7 @@ module Excel =
                     |> Array.iter (fun ((i,j), c) ->
                         upperLeft'  := (min (fst !upperLeft')  i), (min (snd !upperLeft')  j)
                         lowerRight' := (max (fst !lowerRight') i), (max (snd !lowerRight') j)
-                        cells := (!cells).Add (Index(i,j), c)
-                    )
+                        cells := (!cells).Add (Index(i,j), c))
                     Index(!upperLeft'), Index(!lowerRight'), !cells
 
         let cellFormats = 
@@ -103,14 +168,8 @@ module Excel =
             |> Array.map (fun (_, i, x) -> i, x.NumberFormatId.Value)
             |> Map.ofArray
 
-        member x.Rows = rows
-        member x.Cols = cols
-
-        member x.UpperLeft = upperLeft
-        member x.LowerRight = lowerRight
-
-        member x.Values() : CellContent [,] = 
-            // https://stackoverflow.com/questions/19034805/how-to-distinguish-inline-numbers-from-ole-automation-date-numbers-in-openxml-sp/19582685
+        let values =
+        // https://stackoverflow.com/questions/19034805/how-to-distinguish-inline-numbers-from-ole-automation-date-numbers-in-openxml-sp/19582685
             let values = 
                 let a,a' = match lowerRight with | Index(i,j) -> i,j | Label x -> x |> convertLabel 
                 let b,b' = match upperLeft  with | Index(i,j) -> i,j | Label x -> x |> convertLabel 
@@ -140,18 +199,27 @@ module Excel =
                                             values.[i,j] <- CellContent.Decimal(decimal(x.CellValue.Text))))                            
             values
 
-        member x.Ranges () = ranges
+        member x.Rows = rows
+        member x.Cols = cols
+
+        member x.UpperLeft = upperLeft
+        member x.LowerRight = lowerRight
+
+        member x.Values : CellContent [,] = values
+
+        member x.Ranges = ranges
         member x.Range (i : Index, j : Index) =
             match  ranges |> List.filter (fun r -> r.UpperLeft = i && r.LowerRight = j) with
             | x :: _ -> x
             | _ -> let name = sprintf "%A:%A" (convertIndex2 i) (convertIndex2 j)
-                   let range = { Name = name; UpperLeft = i; LowerRight = j; Values = array2D [||] }
+                   let range : Range = { Name = name; UpperLeft = i; LowerRight = j; Values = array2D [||] }
                    ranges <- List.append ranges [ range ]; range               
         member x.Range (name) = 
             match  ranges |> List.filter (fun r -> r.Name = name) with
             | x :: _ -> Some x
             | _ -> None
-        member x.Cells () = ()
+
+        member x.Cells () = cells
         member x.Cells (a, b) = ()
         member x.Cells (rangeObj: obj) = ()
         member x.Cells (rangeName: string) = ()

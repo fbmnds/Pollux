@@ -3,11 +3,14 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Excel", "..\Excel\Excel.fsproj", "{461D72BE-A0DC-4143-9D1F-46E523A52E63}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Excel", "Excel\Excel.fsproj", "{461D72BE-A0DC-4143-9D1F-46E523A52E63}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Word", "Word\Word.fsproj", "{38B20D51-933E-413A-8B2E-E6FA2DE33932}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "UnitTests", "UnitTests\UnitTests.fsproj", "{10D16DB4-E362-4339-926D-7CACD710BE98}"
+	ProjectSection(ProjectDependencies) = postProject
+		{461D72BE-A0DC-4143-9D1F-46E523A52E63} = {461D72BE-A0DC-4143-9D1F-46E523A52E63}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{145C4F21-4EFA-4458-B46C-8F5410D6D4B8}"
 	ProjectSection(SolutionItems) = preProject
