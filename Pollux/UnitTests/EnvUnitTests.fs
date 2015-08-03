@@ -1,4 +1,7 @@
-﻿namespace Pollux.UnitTests
+﻿
+namespace Pollux.UnitTests
+
+#if __TEST_ENV_UNIT_TESTS__
 
 module EnvUnitTests =
 
@@ -156,3 +159,5 @@ module EnvUnitTests =
     [<Test; Category "Pollux.EnvUnitTests">]
     let ``Unquote test 1``() =
         test <@ ([3 + 1..1 + 0] |> List.map ((+) 1)) = [1 + 3..1 + 0] @>
+
+#endif

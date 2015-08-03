@@ -2,6 +2,8 @@
 
 namespace Pollux.Excel
 
+    open Pollux.Excel.Utils  // [<AutoOpen>] does not seem to work for scripts
+
     type private SpreadsheetDocument'   = DocumentFormat.OpenXml.Packaging.SpreadsheetDocument
     type private WorkbookPart'          = DocumentFormat.OpenXml.Packaging.WorkbookPart
     type private WorksheetPart'         = DocumentFormat.OpenXml.Packaging.WorksheetPart
@@ -40,16 +42,16 @@ namespace Pollux.Excel
           UpperLeft    : Index
           LowerRight   : Index
           Values       : CellContent [,] }
-    and DecimalRange = 
-        { mutable Name : string 
-          UpperLeft    : Index
-          LowerRight   : Index
-          Values       : decimal [,] }
     and StringRange = 
         { mutable Name : string 
           UpperLeft    : Index
           LowerRight   : Index
           Values       : string [,] }
+    and DecimalRange = 
+        { mutable Name : string 
+          UpperLeft    : Index
+          LowerRight   : Index
+          Values       : decimal [,] }
 
 
     type RangeWithCheckSumsRow (range : DecimalRange) =
@@ -57,24 +59,56 @@ namespace Pollux.Excel
             if range.Values.GetUpperBound(0) < 1 then 
                 raise (System.ArgumentOutOfRangeException ("CheckSum range row dimension error"))
 
-        let checkSums : decimal [] =
+        let mutable eps = 0.000001M
+
+        let checkSums() : decimal [] =
             [| for col in [0 .. range.Values.GetUpperBound(1)] do
                    yield [| for row in [0 .. range.Values.GetUpperBound(0) - 1] do 
                                 yield range.Values.[row,col] |] |> Array.reduce (+) |]
-        let checkResults : bool [] =
+        let checkResults () : bool [] =
             [| for col in [0 .. range.Values.GetUpperBound(1)] do 
                    yield range.Values.[range.Values.GetUpperBound(0),col] |]
-            |> Array.zip checkSums
-            |> Array.map (fun (x,y) -> x = y)
-        let checkErrors : CellIndex [] = 
-            checkResults
-            |> Array.mapi (fun i x -> i,x)
-            |> Array.filter (fun (i,x) -> x)
-            |> Array.mapi (fun j (i,x) -> Label(convertIndex i j))
-        
-        member x.CheckSums = checkSums
-        member x.CheckResults = checkResults
-        member x.CheckErrors = checkErrors
+            |> Array.zip (checkSums())
+            |> Array.map (fun ((x : decimal), y) -> System.Math.Abs (x - y) < eps)
+        let checkErrors () : CellIndex [] = 
+            checkResults()
+            |> Array.mapi (fun j x -> j,x)
+            |> Array.filter (fun (j,x) -> not x)
+            |> Array.map (fun (j,x) -> 
+                Label(convertIndex (fst range.LowerRight) (j + (snd range.UpperLeft))))
+
+        new (range : Range) =
+            let defaultConversion = function
+            | StringTableIndex _ | Date _ | Empty -> 0M
+            | Decimal x -> x
+            let range' : DecimalRange = 
+                {  Name = range.Name
+                   UpperLeft = range.UpperLeft
+                   LowerRight = range.LowerRight
+                   Values = range.Values |> Array2D.map (fun x -> (defaultConversion x))  }
+            new RangeWithCheckSumsRow (range')
+
+        new (range : Range, conversion) =
+            let range' : DecimalRange = 
+                {  Name = range.Name
+                   UpperLeft = range.UpperLeft
+                   LowerRight = range.LowerRight
+                   Values = range.Values |> Array2D.map (fun x -> (conversion x))  }
+            new RangeWithCheckSumsRow (range')
+
+        new (range : Range, conversion) =
+            let range' : DecimalRange = 
+                {  Name = range.Name
+                   UpperLeft = range.UpperLeft
+                   LowerRight = range.LowerRight
+                   Values = range.Values |> Array2D.mapi (fun i j x -> (conversion i j x))  }
+            new RangeWithCheckSumsRow (range')
+
+        member x.CheckSums = checkSums()
+        member x.CheckResults = checkResults()
+        member x.CheckErrors = checkErrors()
+        member x.Eps with get() = eps and set(e) =  eps <- e
+
 
 
     type RangeWithCheckSumsCol (range : DecimalRange) =
@@ -82,24 +116,55 @@ namespace Pollux.Excel
             if range.Values.GetUpperBound(1) < 1 then 
                 raise (System.ArgumentOutOfRangeException ("CheckSum range column dimension error"))
 
-        let checkSums : decimal [] =
+        let mutable eps = 0.000001M 
+
+        let checkSums () : decimal [] =
             [| for row in [0 .. range.Values.GetUpperBound(0)] do
                    yield [| for col in [0 .. range.Values.GetUpperBound(1) - 1] do 
                                 yield range.Values.[row,col] |] |> Array.reduce (+) |]
-        let checkResults : bool [] =
+        let checkResults () : bool [] =
             [| for row in [0 .. range.Values.GetUpperBound(0)] do 
                    yield range.Values.[row, range.Values.GetUpperBound(1)] |]
-            |> Array.zip checkSums
-            |> Array.map (fun (x,y) -> x = y)
-        let checkErrors : CellIndex [] = 
-            checkResults
+            |> Array.zip (checkSums())
+            |> Array.map (fun ((x : decimal), y) -> System.Math.Abs (x - y) < eps)
+        let checkErrors () : CellIndex [] = 
+            checkResults()
             |> Array.mapi (fun i x -> i,x)
-            |> Array.filter (fun (i,x) -> x)
-            |> Array.mapi (fun j (i,x) -> Label(convertIndex i j))
-        
-        member x.CheckSums = checkSums
-        member x.CheckResults = checkResults
-        member x.CheckErrors = checkErrors
+            |> Array.filter (fun (i,x) -> not x)
+            |> Array.map (fun (i,x) ->  
+                Label(convertIndex (i + (fst range.UpperLeft)) (snd range.LowerRight)))
+
+        new (range : Range) =
+            let defaultConversion = function
+            | StringTableIndex _ | Date _ | Empty -> 0M
+            | Decimal x -> x
+            let range' : DecimalRange = 
+                {  Name = range.Name
+                   UpperLeft = range.UpperLeft
+                   LowerRight = range.LowerRight
+                   Values = range.Values |> Array2D.map (fun x -> (defaultConversion x))  }
+            new RangeWithCheckSumsCol (range')
+
+        new (range : Range, conversion) =
+            let range' : DecimalRange = 
+                {  Name = range.Name
+                   UpperLeft = range.UpperLeft
+                   LowerRight = range.LowerRight
+                   Values = range.Values |> Array2D.map (fun x -> (conversion x))  }
+            new RangeWithCheckSumsCol (range')
+
+        new (range : Range, conversion) =
+            let range' : DecimalRange = 
+                {  Name = range.Name
+                   UpperLeft = range.UpperLeft
+                   LowerRight = range.LowerRight
+                   Values = range.Values |> Array2D.mapi (fun i j x -> (conversion i j x))  }
+            new RangeWithCheckSumsCol (range')
+                    
+        member x.CheckSums = checkSums ()
+        member x.CheckResults = checkResults ()
+        member x.CheckErrors = checkErrors ()
+        member x.Eps with get() = eps and set(e) = eps <- e
 
 
     type Workbook (fileName : string, editable: bool) =
@@ -194,7 +259,7 @@ namespace Pollux.Excel
                                         values.[i,j] <- CellContent.Decimal(decimal(x.CellValue.Text))
                                     else
                                         if cellDateTimeFormats.ContainsKey (int x.StyleIndex.Value) then 
-                                            values.[i,j] <- CellContent.Date(fromJulianDate (int64 x.CellValue.Text))
+                                            values.[i,j] <- CellContent.Date(fromJulianDate (int64 (decimal x.CellValue.Text)))
                                         else 
                                             values.[i,j] <- CellContent.Decimal(decimal(x.CellValue.Text))))                            
             values
@@ -227,3 +292,7 @@ namespace Pollux.Excel
         member x.CellDateTimeFormats 
             with get() = cellDateTimeFormats
             and set(dict) = cellDateTimeFormats <- dict
+
+        static member ConvertCellIndex = function
+            | Label label -> Index (convertLabel label)
+            | Index (x,y) -> Label (convertIndex x y)

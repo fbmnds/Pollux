@@ -53,9 +53,6 @@ let inline convertLabel (label : string) =
 let inline convertIndex x y = sprintf "%s%d" (ColumnLabel y) (x + 1)
 let inline convertIndex2 (x : int*int) = convertIndex (fst x) (snd x)
 
-//    let ConvertCellIndex = function
-//    | Label label -> Index (convertLabel label)
-//    | Index (x,y) -> Label (convertIndex x y)
 
 let rec isDateTime (s : string) =
     run (anyOf "ymdhs:") s
@@ -72,4 +69,8 @@ let builtInDateTimeNumberFormatIDs =
         
 let fromJulianDate x = 
     // System.DateTime.Parse("30.12.1899").Ticks = 599264352000000000L
-    System.DateTime(599264352000000000L + (System.TimeSpan.TicksPerDay * x)) 
+    // System.TimeSpan.TicksPerDay = 864000000000L
+    System.DateTime(599264352000000000L + (864000000000L * x)) 
+
+let toJulianDate (x : System.DateTime) =
+    (x.ToBinary() - 599264352000000000L) / 864000000000L
