@@ -32,9 +32,23 @@ namespace Pollux.Excel
 
     type CellContent =
     | StringTableIndex  of int32
+    | InlineString      of string
     | Decimal           of decimal
     | Date              of System.DateTime
     | Empty          
+
+
+    type Cell = 
+        { CellValue          : CellContent 
+          InlineString       : CellContent
+          CellFormula        : string
+          ExtensionList      : string 
+          CellMetadataIndex  : string
+          ShowPhonetic       : string
+          Reference          : CellIndex
+          StyleIndex         : string
+          CellDataType       : string
+          ValueMetadataIndex : string }
 
 
     type Range =
@@ -79,7 +93,7 @@ namespace Pollux.Excel
 
         new (range : Range) =
             let defaultConversion = function
-            | StringTableIndex _ | Date _ | Empty -> 0M
+            | StringTableIndex _ | Date _ | InlineString _ | Empty  -> 0M
             | Decimal x -> x
             let range' : DecimalRange = 
                 {  Name = range.Name
@@ -110,7 +124,6 @@ namespace Pollux.Excel
         member x.Eps with get() = eps and set(e) =  eps <- e
 
 
-
     type RangeWithCheckSumsCol (range : DecimalRange) =
         do
             if range.Values.GetUpperBound(1) < 1 then 
@@ -136,7 +149,7 @@ namespace Pollux.Excel
 
         new (range : Range) =
             let defaultConversion = function
-            | StringTableIndex _ | Date _ | Empty -> 0M
+            | StringTableIndex _ | Date _ | InlineString _ | Empty -> 0M
             | Decimal x -> x
             let range' : DecimalRange = 
                 {  Name = range.Name
