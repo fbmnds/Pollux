@@ -39,8 +39,8 @@ namespace Pollux.Excel
 
 
     type Cell = 
-        { CellValue          : CellContent 
-          InlineString       : CellContent
+        { CellValue          : string 
+          InlineString       : string
           CellFormula        : string
           ExtensionList      : string 
           CellMetadataIndex  : string
