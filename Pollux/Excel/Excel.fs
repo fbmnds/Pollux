@@ -18,13 +18,48 @@ namespace Pollux.Excel
     type private SharedStringItem'      = DocumentFormat.OpenXml.Spreadsheet.SharedStringItem
     type private NumberingFormat'       = DocumentFormat.OpenXml.Spreadsheet.NumberingFormat
 
-
-    type CellIndex = 
-    | Label of string
-    | Index of Index
-    and Index = RowIndex*ColIndex
+    type Index = RowIndex*ColIndex
     and RowIndex = int
     and ColIndex = int
+    and Label    = string
+
+    [<CustomEquality; CustomComparison>]
+    type CellIndex = 
+    | Label of Label
+    | Index of Index
+        member x.ToTuple : int*int = 
+            match x with
+            | Label x -> convertLabel x
+            | Index x -> (fst x), (snd x)
+
+        override x.GetHashCode() = x.GetHashCode()
+
+        override x.Equals(y) =
+            match y with
+            | :? CellIndex as y -> 
+                match y with
+                |  Label y as y' -> y'.ToTuple = x.ToTuple
+                |  Index y as y' -> y'.ToTuple = x.ToTuple
+            | _ -> invalidArg (sprintf "'%A'" y) "is not comparable to CellIndex."
+
+        interface System.IComparable with
+           member x.CompareTo y = 
+              match y with 
+              | :? CellIndex as y -> 
+                  match y with
+                  | Label y as y' -> 
+                       let (a,b) = y'.ToTuple
+                       let (a',b') = x.ToTuple
+                       if a=a' && b=b' then 0
+                       else if a>a' && b>b' then 1
+                       else -1
+                  | Index y as y' -> 
+                       let (a,b) = y'.ToTuple
+                       let (a',b') = x.ToTuple
+                       if a=a' && b=b' then 0
+                       else if a>a' && b>b' then 1
+                       else -1              
+              | _ -> invalidArg (sprintf "'%A'" y) "is not comparable to CellIndex."
         
 
     type CellContent =

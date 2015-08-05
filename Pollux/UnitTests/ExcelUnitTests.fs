@@ -56,7 +56,7 @@ module ExcelUnitTests =
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_1.txt``))
 
-        let i2',j2' = match sheet2.UpperLeft  with | Index(i,j) -> i,j | Label x -> x |> convertLabel
+        let i2',j2' = sheet2.UpperLeft.ToTuple
         [ for i in [0 .. sheet2.Values.GetUpperBound(0)] do
               for j in [0 .. sheet2.Values.GetUpperBound(1)] do
                   yield if sheet2.Values.[i,j] <> CellContent.Empty 
@@ -65,7 +65,7 @@ module ExcelUnitTests =
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_2.txt``))
 
-        let i3',j3' = match sheet3.UpperLeft  with | Index(i,j) -> i,j | Label x -> x |> convertLabel
+        let i3',j3' = sheet3.UpperLeft.ToTuple
         [ for i in [0 .. sheet3.Values.GetUpperBound(0)] do
               for j in [0 .. sheet3.Values.GetUpperBound(1)] do
                   yield if sheet3.Values.[i,j] <> CellContent.Empty 
@@ -83,8 +83,8 @@ module ExcelUnitTests =
         let errors : CellIndex [] = [||]
         let range' : Range = 
             {  Name = "Cost Summary2.xlsx : CheckSums"
-               UpperLeft  = match sheet2.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> convertLabel
-               LowerRight = match sheet2.LowerRight  with | Index(i,j) -> i,j | Label x -> x |> convertLabel
+               UpperLeft  = sheet2.UpperLeft.ToTuple
+               LowerRight = sheet2.LowerRight.ToTuple
                Values = sheet2.Values }
         RangeWithCheckSumsRow (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
@@ -103,8 +103,8 @@ module ExcelUnitTests =
         let errors : CellIndex [] = [| Label "I29" |]
         let range' : Range = 
             {  Name = "Cost Summary2.xlsx : CheckSums2"
-               UpperLeft  = match sheet3.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> convertLabel
-               LowerRight = match sheet3.LowerRight  with | Index(i,j) -> i,j | Label x -> x |> convertLabel
+               UpperLeft  = sheet3.UpperLeft.ToTuple
+               LowerRight = sheet3.LowerRight.ToTuple
                Values = sheet3.Values }
         RangeWithCheckSumsRow (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
@@ -139,8 +139,8 @@ module ExcelUnitTests =
         let errors : CellIndex [] = [||]
         let range' : Range = 
             {  Name = "Cost Summary2.xlsx : CheckSums"
-               UpperLeft  = match sheet2.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> convertLabel
-               LowerRight = match sheet2.LowerRight  with | Index(i,j) -> i,j | Label x -> x |> convertLabel
+               UpperLeft  = sheet2.UpperLeft.ToTuple
+               LowerRight = sheet2.LowerRight.ToTuple
                Values = sheet2.Values }
         RangeWithCheckSumsCol (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
@@ -170,12 +170,12 @@ module ExcelUnitTests =
         let errors : CellIndex [] = [| Label "I4" |]
         let range' : Range = 
             {  Name = "Cost Summary2.xlsx : CheckSums2"
-               UpperLeft  = match sheet3.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> convertLabel
-               LowerRight = match sheet3.LowerRight  with | Index(i,j) -> i,j | Label x -> x |> convertLabel
+               UpperLeft  = sheet3.UpperLeft.ToTuple
+               LowerRight = sheet3.LowerRight.ToTuple
                Values = sheet3.Values }
         let conversion (i: int) (j: int) x = 
             match x with
-            | StringTableIndex _ | Empty -> 0M
+            | StringTableIndex _ | InlineString _ | Empty -> 0M
             | Decimal x -> x
             | Date x -> decimal (toJulianDate x)
         RangeWithCheckSumsCol (range', conversion)
