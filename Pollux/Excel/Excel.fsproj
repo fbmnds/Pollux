@@ -51,7 +51,8 @@
   <ItemGroup>
     <Compile Include="Utils.fs" />
     <Compile Include="Excel.fs" />
-    <None Include="Script.fsx" />
+    <None Include="Range.fsx" />
+    <None Include="Xml.IO.fsx" />
     <Content Include="packages.config" />
     <Content Include="app.config" />
   </ItemGroup>
@@ -72,6 +73,8 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

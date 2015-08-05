@@ -5,11 +5,17 @@ module Pollux.Excel.Utils
 
 open FParsec
 
+open System.Xml
+open System.Xml.Linq
+open System.Xml.XPath
+
+open System.IO.Packaging
 
 let inline isNull x = x = Unchecked.defaultof<_>
 let inline isNotNull x = x |> isNull |> not
 
 let inline (|IsNull|) x = isNull x 
+    
        
 type FileFullName (fileName) =
     member x.Value = System.IO.FileInfo(fileName).FullName 
@@ -67,10 +73,43 @@ let builtInDateTimeNumberFormatIDs =
         45u; 46u; 47u; 50u;
         51u; 52u; 53u; 54u; 55u; 56u; 57u; 58u |]
         
-let fromJulianDate x = 
+let inline fromJulianDate x = 
     // System.DateTime.Parse("30.12.1899").Ticks = 599264352000000000L
     // System.TimeSpan.TicksPerDay = 864000000000L
     System.DateTime(599264352000000000L + (864000000000L * x)) 
 
-let toJulianDate (x : System.DateTime) =
+let inline toJulianDate (x : System.DateTime) =
     (x.ToBinary() - 599264352000000000L) / 864000000000L
+
+
+let getPart (fileName : string) (xPath : string) (partUri : string) = 
+    use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
+    let part = 
+        xlsx.GetParts()
+        |> Seq.filter (fun x -> x.Uri.ToString() = partUri)
+        |> Seq.head
+    use stream = part.GetStream(System.IO.FileMode.Open, System.IO.FileAccess.Read)
+    let xml = new XPathDocument(stream)
+    let navigator = xml.CreateNavigator()
+    let manager = new XmlNamespaceManager(navigator.NameTable)
+    let expression = XPathExpression.Compile(xPath, manager)
+    seq { 
+        match expression.ReturnType with
+        | XPathResultType.NodeSet -> 
+            let nodes = navigator.Select(expression)
+            while nodes.MoveNext() do
+                yield nodes.Current.OuterXml
+        | _ -> failwith <| sprintf "XPath-Expression return type %A not implemented" expression.ReturnType
+    }
+
+
+let getSheetId (fileName : string) (sheetName : string) =
+    let partUri = "/xl/workbook.xml"
+    let xPath = (sprintf "//*[name()='sheet' and @name='%s']" sheetName)
+    getPart fileName xPath partUri
+    |> Seq.head
+    |> fun x -> 
+        let xn s = XName.Get(s)
+        let xd = XDocument.Parse(x)
+        xd.Root.Attribute(xn "sheetId").Value
+

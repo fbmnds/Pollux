@@ -1,23 +1,20 @@
 ﻿namespace Pollux
 
 namespace Pollux.Excel
-
-    open Pollux.Excel.Utils  // [<AutoOpen>] does not seem to work for scripts
-
+#if INTERACTIVE
+    open Pollux.Excel.Utils
+#endif
     type private SpreadsheetDocument'   = DocumentFormat.OpenXml.Packaging.SpreadsheetDocument
-    type private WorkbookPart'          = DocumentFormat.OpenXml.Packaging.WorkbookPart
     type private WorksheetPart'         = DocumentFormat.OpenXml.Packaging.WorksheetPart
-    type private SharedStringTablePart' = DocumentFormat.OpenXml.Packaging.SharedStringTablePart
+    //type private SharedStringTablePart' = DocumentFormat.OpenXml.Packaging.SharedStringTablePart
 
     type private Sheet'                 = DocumentFormat.OpenXml.Spreadsheet.Sheet
-    type private Worksheet'             = DocumentFormat.OpenXml.Spreadsheet.Worksheet
     type private Row'                   = DocumentFormat.OpenXml.Spreadsheet.Row
     type private Column'                = DocumentFormat.OpenXml.Spreadsheet.Column
     type private Cell'                  = DocumentFormat.OpenXml.Spreadsheet.Cell
-    type private CellType'              = DocumentFormat.OpenXml.Spreadsheet.CellType
     type private CellFormat'            = DocumentFormat.OpenXml.Spreadsheet.CellFormat
     type private CellValues'            = DocumentFormat.OpenXml.Spreadsheet.CellValues
-    type private SharedStringTable'     = DocumentFormat.OpenXml.Spreadsheet.SharedStringTable
+    //type private SharedStringTable'     = DocumentFormat.OpenXml.Spreadsheet.SharedStringTable
     type private SharedStringItem'      = DocumentFormat.OpenXml.Spreadsheet.SharedStringItem
     type private NumberingFormat'       = DocumentFormat.OpenXml.Spreadsheet.NumberingFormat
 
@@ -87,8 +84,8 @@ namespace Pollux.Excel
         let checkErrors () : CellIndex [] = 
             checkResults()
             |> Array.mapi (fun j x -> j,x)
-            |> Array.filter (fun (j,x) -> not x)
-            |> Array.map (fun (j,x) -> 
+            |> Array.filter (fun (_,x) -> not x)
+            |> Array.map (fun (j,_) -> 
                 Label(convertIndex (fst range.LowerRight) (j + (snd range.UpperLeft))))
 
         new (range : Range) =
@@ -143,8 +140,8 @@ namespace Pollux.Excel
         let checkErrors () : CellIndex [] = 
             checkResults()
             |> Array.mapi (fun i x -> i,x)
-            |> Array.filter (fun (i,x) -> not x)
-            |> Array.map (fun (i,x) ->  
+            |> Array.filter (fun (_,x) -> not x)
+            |> Array.map (fun (i,_) ->  
                 Label(convertIndex (i + (fst range.UpperLeft)) (snd range.LowerRight)))
 
         new (range : Range) =
@@ -251,8 +248,8 @@ namespace Pollux.Excel
             let values = 
                 let a,a' = match lowerRight with | Index(i,j) -> i,j | Label x -> x |> convertLabel 
                 let b,b' = match upperLeft  with | Index(i,j) -> i,j | Label x -> x |> convertLabel 
-                array2D [| for i in [0 ..(a-b)] do 
-                                yield [ for j in [0 .. (a'-b')] do yield CellContent.Empty ] |]
+                array2D [| for _ in [0 ..(a-b)] do 
+                                yield [ for _ in [0 .. (a'-b')] do yield CellContent.Empty ] |]
             rows
             |> Array.iteri (fun i row -> 
                     row.Elements<Cell'>() 
