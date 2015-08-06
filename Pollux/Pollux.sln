@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.31101.0
+VisualStudioVersion = 12.0.40629.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Excel", "Excel\Excel.fsproj", "{461D72BE-A0DC-4143-9D1F-46E523A52E63}"
 EndProject
@@ -15,6 +15,18 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{145C4F21-4EFA-4458-B46C-8F5410D6D4B8}"
 	ProjectSection(SolutionItems) = preProject
 		.nuget\packages.config = .nuget\packages.config
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{49BE6C15-AAC9-48D9-A919-4E678C871A94}"
+	ProjectSection(SolutionItems) = preProject
+		Performance1.psess = Performance1.psess
+	EndProjectSection
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Console", "Console\Console.fsproj", "{71A784CA-4853-422D-896D-C69786B40D99}"
+	ProjectSection(ProjectDependencies) = postProject
+		{38B20D51-933E-413A-8B2E-E6FA2DE33932} = {38B20D51-933E-413A-8B2E-E6FA2DE33932}
+		{10D16DB4-E362-4339-926D-7CACD710BE98} = {10D16DB4-E362-4339-926D-7CACD710BE98}
+		{461D72BE-A0DC-4143-9D1F-46E523A52E63} = {461D72BE-A0DC-4143-9D1F-46E523A52E63}
 	EndProjectSection
 EndProject
 Global
@@ -35,6 +47,10 @@ Global
 		{10D16DB4-E362-4339-926D-7CACD710BE98}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{10D16DB4-E362-4339-926D-7CACD710BE98}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{10D16DB4-E362-4339-926D-7CACD710BE98}.Release|Any CPU.Build.0 = Release|Any CPU
+		{71A784CA-4853-422D-896D-C69786B40D99}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{71A784CA-4853-422D-896D-C69786B40D99}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{71A784CA-4853-422D-896D-C69786B40D99}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{71A784CA-4853-422D-896D-C69786B40D99}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

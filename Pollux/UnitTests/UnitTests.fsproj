@@ -107,7 +107,8 @@
   <ItemGroup>
     <Compile Include="NUnitRunner.fs" />
     <Compile Include="EnvUnitTests.fs" />
-    <Compile Include="ExcelUnitTests.fs" />
+    <Compile Include="ExcelBasicsTests.fs" />
+    <Compile Include="ExcelLargeFilesTests.fs" />
     <None Include="Script.fsx" />
     <None Include="packages.config" />
     <None Include="App.config" />

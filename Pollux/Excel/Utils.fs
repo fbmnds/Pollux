@@ -114,4 +114,3 @@ let getSheetId (fileName : string) (sheetName : string) =
     |> Seq.head
     |> fun x -> 
         (xd x).Root.Attribute(xn "sheetId").Value
-

@@ -1,17 +1,15 @@
-﻿namespace Pollux.UnitTests
+﻿namespace Pollux.UnitTests.Excel
 
-module ExcelUnitTests =
+module Basics =
 
     open FsUnit
-    open FsCheck
     open NUnit.Framework
-    open NUnit.Framework.Constraints
-    open Swensen.Unquote
+
 
     open Pollux.Excel
     open Pollux.Excel.Utils    
 
-    let ``Cost Summary2.xlsx`` = __SOURCE_DIRECTORY__ + @"\data\Cost Summary2.xlsx"
+    let ``Cost Summary2.xlsx``  = __SOURCE_DIRECTORY__ + @"\data\Cost Summary2.xlsx"
     let ``Cost Summary2_1.txt`` = __SOURCE_DIRECTORY__ + @"\data\Cost Summary2_1.txt"
     let ``Cost Summary2_2.txt`` = __SOURCE_DIRECTORY__ + @"\data\Cost Summary2_2.txt"
     let ``Cost Summary2_3.txt`` = __SOURCE_DIRECTORY__ + @"\data\Cost Summary2_3.txt"
@@ -34,7 +32,7 @@ module ExcelUnitTests =
         ["A1"; "H29"] |> List.map convertLabel |> should equal [(0,0); (28,7)]
 
     [<Test; Category "Pollux.Excel.Utils">]
-    let ``Excel : Utils : convertIndex(2)``() =
+    let ``Excel : Utils : convertIndex2``() =
         [(0,0); (28,7)] |> List.map convertIndex2 |> should equal ["A1"; "H29"]
         
     [<Test; Category "Pollux.Excel">]
@@ -75,13 +73,10 @@ module ExcelUnitTests =
     [<Test; Category "Pollux.Excel">]
     let ``Excel : Sheet : Values : 2``() =
         let i2',j2' = sheet2.UpperLeft.ToTuple
-        use file = new System.IO.StreamWriter(@"C:\Users\Friedrich\projects\Pollux\Pollux\UnitTests\data\test.txt")
         [ for i in [0 .. sheet2.Values.GetUpperBound(0)] do
               for j in [0 .. sheet2.Values.GetUpperBound(1)] do
                   yield if sheet2.Values.[i,j] <> CellContent.Empty 
-                        then 
-                            file.WriteLine(sprintf "%s %A" (convertIndex (i+i2') (j+j2')) sheet2.Values.[i,j])
-                            sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) sheet2.Values.[i,j];
+                        then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) sheet2.Values.[i,j];
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_2.txt``))

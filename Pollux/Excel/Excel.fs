@@ -4,6 +4,7 @@ namespace Pollux.Excel
    
 #if INTERACTIVE
     open Pollux.Excel.Utils
+    open Pollux.Log
 #endif
 
     type private SpreadsheetDocument'   = DocumentFormat.OpenXml.Packaging.SpreadsheetDocument
@@ -233,32 +234,36 @@ namespace Pollux.Excel
         member x.FileFullName = fileFullName
 
       
-    type Sheet (fileName : string, sheetName: string, editable: bool) =
+    type Sheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
         let sheetName = sheetName
-
+        // let logInfo () = log.LogLine Pollux.Log.LogLevel.Info 
+        //let logError = log.LogLine Pollux.Log.LogLevel.Error
         let cells = 
             let partUri = sprintf "/xl/worksheets/sheet%s.xml" (getSheetId fileName sheetName)
             let xPath = "//*[name()='c']"
+            log.LogLine Pollux.Log.LogLevel.Info "Reading cells from %s, sheet %s in part %s:" fileName sheetName partUri
             getPart fileName xPath partUri
-            |> Seq.map (fun x -> 
-                let test name = 
-                    let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
-                    if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
-                let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
-                let xa s = test' ((xd x).Root.Attribute(xn s))
-                { CellValue          = test "v";
-                  InlineString       = test "is"
-                  CellFormula        = test "f";
-                  ExtensionList      = test "extLst"; 
-                  CellMetadataIndex  = xa "cm";
-                  ShowPhonetic       = xa "ph";
-                  Reference          = xa "r";
-                  StyleIndex         = xa "s";
-                  CellDataType       = xa "t";
-                  ValueMetadataIndex = xa "vm" })
-            |> Seq.map (fun x -> x.Reference, x )
-            |> Seq.sort
-            |> Map.ofSeq
+            |> fun x -> 
+                log.LogLine Pollux.Log.LogLevel.Info "%s" ("getPart finished, parsing ...") ; 
+                x |> Seq.map (fun x -> 
+                    let test name = 
+                        let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
+                        if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
+                    let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
+                    let xa s = test' ((xd x).Root.Attribute(xn s))
+                    { CellValue          = test "v";
+                      InlineString       = test "is"
+                      CellFormula        = test "f";
+                      ExtensionList      = test "extLst"; 
+                      CellMetadataIndex  = xa "cm";
+                      ShowPhonetic       = xa "ph";
+                      Reference          = xa "r";
+                      StyleIndex         = xa "s";
+                      CellDataType       = xa "t";
+                      ValueMetadataIndex = xa "vm" })
+            |> fun x -> 
+                log.LogLine Pollux.Log.LogLevel.Info "%s" "Parsing finished,  reorg seq ..." ; 
+                x |> Seq.map (fun x -> x.Reference, x )
 
         //let sharedStringTable = workbookPart.SharedStringTablePart.SharedStringTable
         //let sharedStringItems = sharedStringTable.Elements<SharedStringItem'>()
@@ -266,10 +271,11 @@ namespace Pollux.Excel
         
         let rows = []
         let cols = []
+
         let upperLeft, lowerRight, keys =
-            if cells.Count = 0 then Index(0,0), Index(0,0), Seq.empty
+            if cells |> Seq.length = 0 then Index(0,0), Index(0,0), Seq.empty
             else
-                let keys = cells |> Map.toSeq |> Seq.map (fun (k,_) -> convertLabel k)
+                let keys = cells |> Seq.map (fun (k,_) -> convertLabel k)
                 let x,y = keys |> Seq.map (fun (i,_) -> i), keys |> Seq.map (fun (_,j) -> j)
                 Index((Seq.min x),(Seq.min y)), Index((Seq.max x),(Seq.max y)), keys |> Seq.map (fun x -> Index(x))
 
@@ -316,13 +322,14 @@ namespace Pollux.Excel
             else false
 
         let values =
+            log.LogLine Pollux.Log.LogLevel.Info "%s" "Building values ..."
             let a,a' = Sheet.ConvertCellIndex2 lowerRight
             let b,b' = Sheet.ConvertCellIndex2 upperLeft 
             let evaluate i j =
                 let index = convertIndex (i+b) (j+b')
-                if cells.ContainsKey(index) then
-                    let x = cells.[index]
-                    //printfn "%A %A" (Label(convertIndex i j)) x
+                let xs = cells |> Seq.filter (fun (k,v) -> k = index)
+                if xs |> Seq.isEmpty |> not then
+                    let x = xs |> Seq.head |> snd
                     if x.InlineString <> "" then CellContent.InlineString (x.InlineString)
                     else if x.CellDataType = "s" then CellContent.StringTableIndex (int32 (x.CellValue))
                     else if x.CellValue <> "" then 
@@ -332,9 +339,16 @@ namespace Pollux.Excel
                     else CellContent.Empty
                 else CellContent.Empty
             array2D [| for i in [0 .. (a-b)] do 
-                            yield [ for j in [0 .. (a'-b')] do yield (evaluate i j) ] |]
+                            yield [ for j in [0 .. (a'-b')] do 
+                                        if j = (a'-b') then
+                                            log.LogLine Pollux.Log.LogLevel.Info "read line %d with %d cells" i j
+                                        yield (evaluate i j) ] |]
 
-        new (workbook : Workbook, sheetName: string, editable: bool) = Sheet (workbook.FileFullName, sheetName , editable)
+        new (workbook : Workbook, sheetName: string, editable: bool) = 
+            Sheet (((new Pollux.Log.PseudoLogger()) :> Pollux.Log.ILogger), workbook.FileFullName, sheetName , editable)
+
+        new (fileName : string, sheetName: string, editable: bool) = 
+            Sheet (((new Pollux.Log.PseudoLogger()) :> Pollux.Log.ILogger), fileName, sheetName , editable)
 
         member x.Rows = rows
         member x.Cols = cols
