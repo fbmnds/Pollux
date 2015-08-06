@@ -1,5 +1,4 @@
-﻿// Weitere Informationen zu F# unter "http://fsharp.net".
-// Weitere Hilfe finden Sie im Projekt "F#-Lernprogramm".
+﻿
 
 open System.Xml
 open System.Xml.Linq
@@ -21,5 +20,5 @@ let main argv =
     do
         let sheet = Sheet ((new ConsoleLogger()), ``file6000rows.xlsx``, "Random", false)
         Pollux.Log.logInfo "%A" sheet.UpperLeft
-
+        System.Console.ReadKey() |> ignore
     0

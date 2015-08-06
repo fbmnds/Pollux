@@ -67,11 +67,11 @@ let rec isDateTime (s : string) =
     | _ -> if  s = "" then false else isDateTime (s.Substring 1)
 
 let builtInDateTimeNumberFormatIDs = 
-    seq [ 14u; 15u; 16u; 17u; 18u; 19u;
-        20u; 21u; 22u; 27u; 28u; 29u; 
-        30u; 31u; 32u; 33u; 34u; 35u; 36u;
-        45u; 46u; 47u; 50u;
-        51u; 52u; 53u; 54u; 55u; 56u; 57u; 58u ]
+    [| 14u; 15u; 16u; 17u; 18u; 19u;
+       20u; 21u; 22u; 27u; 28u; 29u; 
+       30u; 31u; 32u; 33u; 34u; 35u; 36u;
+       45u; 46u; 47u; 50u;
+       51u; 52u; 53u; 54u; 55u; 56u; 57u; 58u |]
     |> Seq.map string
         
 let inline fromJulianDate x = 
@@ -84,6 +84,7 @@ let inline toJulianDate (x : System.DateTime) =
 
 
 let getPart (fileName : string) (xPath : string) (partUri : string) = 
+    printfn "%s Beginning getPart with xPath %s, partUri %s" (Pollux.Log.now()) xPath partUri
     use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
     let part = 
         xlsx.GetParts()
@@ -94,14 +95,19 @@ let getPart (fileName : string) (xPath : string) (partUri : string) =
     let navigator = xml.CreateNavigator()
     let manager = new XmlNamespaceManager(navigator.NameTable)
     let expression = XPathExpression.Compile(xPath, manager)
-    seq { 
-        match expression.ReturnType with
-        | XPathResultType.NodeSet -> 
-            let nodes = navigator.Select(expression)
-            while nodes.MoveNext() do
-                yield nodes.Current.OuterXml
-        | _ -> failwith <| sprintf "XPath-Expression return type %A not implemented" expression.ReturnType
-    }
+    let result = 
+        seq { 
+            match expression.ReturnType with
+            | XPathResultType.NodeSet -> 
+                let nodes = navigator.Select(expression)
+                while nodes.MoveNext() do
+                    yield nodes.Current.OuterXml
+            | _ -> failwith <| sprintf "XPath-Expression return type %A not implemented" expression.ReturnType
+        } |> Seq.cache
+    stream.Dispose()
+    xlsx.Close()
+    printfn "%s getPart with xPath %s, partUri %s finished" (Pollux.Log.now()) xPath partUri
+    result
 
 
 let xn s = System.Xml.Linq.XName.Get(s)
