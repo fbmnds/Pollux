@@ -38,33 +38,56 @@ module ExcelUnitTests =
         [(0,0); (28,7)] |> List.map convertIndex2 |> should equal ["A1"; "H29"]
         
     [<Test; Category "Pollux.Excel">]
-    let ``Excel : Sheet : UpperLeft``() =
+    let ``Excel : Sheet : UpperLeft : 1``() =
         sheet.UpperLeft |> should equal (Index(0,0))
 
     [<Test; Category "Pollux.Excel">]
-    let ``Excel : Sheet : LowerRight``() =
+    let ``Excel : Sheet : UpperLeft : 2``() =
+        sheet2.UpperLeft |> should equal (Index(0,1))
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : Sheet : UpperLeft : 3``() =
+        sheet3.UpperLeft |> should equal (Index(0,1))
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : Sheet : LowerRight : 1``() =
         sheet.LowerRight |> should equal (Index(32,7))
 
     [<Test; Category "Pollux.Excel">]
-    let ``Excel : Sheet : Values``() =
-        // i',j' = 0,0
+    let ``Excel : Sheet : LowerRight : 2``() =
+        sheet2.LowerRight |> should equal (Index(28,8))
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : Sheet : LowerRight : 3``() =
+        sheet3.LowerRight |> should equal (Index(28,8))
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : Sheet : Values : 1``() =
+        let i',j' = sheet.UpperLeft.ToTuple
         [ for i in [0 .. sheet.Values.GetUpperBound(0)] do
               for j in [0 .. sheet.Values.GetUpperBound(1)] do
                   yield if sheet.Values.[i,j] <> CellContent.Empty 
-                        then sprintf "%s %A\r\n" (convertIndex i j) sheet.Values.[i,j];
+                        then sprintf "%s %A\r\n" (convertIndex (i+i') (j+j')) sheet.Values.[i,j]
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_1.txt``))
 
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : Sheet : Values : 2``() =
         let i2',j2' = sheet2.UpperLeft.ToTuple
+        use file = new System.IO.StreamWriter(@"C:\Users\Friedrich\projects\Pollux\Pollux\UnitTests\data\test.txt")
         [ for i in [0 .. sheet2.Values.GetUpperBound(0)] do
               for j in [0 .. sheet2.Values.GetUpperBound(1)] do
                   yield if sheet2.Values.[i,j] <> CellContent.Empty 
-                        then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) sheet2.Values.[i,j];
+                        then 
+                            file.WriteLine(sprintf "%s %A" (convertIndex (i+i2') (j+j2')) sheet2.Values.[i,j])
+                            sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) sheet2.Values.[i,j];
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_2.txt``))
 
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : Sheet : Values : 3``() =
         let i3',j3' = sheet3.UpperLeft.ToTuple
         [ for i in [0 .. sheet3.Values.GetUpperBound(0)] do
               for j in [0 .. sheet3.Values.GetUpperBound(1)] do

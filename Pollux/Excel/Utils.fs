@@ -67,11 +67,12 @@ let rec isDateTime (s : string) =
     | _ -> if  s = "" then false else isDateTime (s.Substring 1)
 
 let builtInDateTimeNumberFormatIDs = 
-    [| 14u; 15u; 16u; 17u; 18u; 19u;
+    seq [ 14u; 15u; 16u; 17u; 18u; 19u;
         20u; 21u; 22u; 27u; 28u; 29u; 
         30u; 31u; 32u; 33u; 34u; 35u; 36u;
         45u; 46u; 47u; 50u;
-        51u; 52u; 53u; 54u; 55u; 56u; 57u; 58u |]
+        51u; 52u; 53u; 54u; 55u; 56u; 57u; 58u ]
+    |> Seq.map string
         
 let inline fromJulianDate x = 
     // System.DateTime.Parse("30.12.1899").Ticks = 599264352000000000L
@@ -103,13 +104,14 @@ let getPart (fileName : string) (xPath : string) (partUri : string) =
     }
 
 
+let xn s = System.Xml.Linq.XName.Get(s)
+let xd s = System.Xml.Linq.XDocument.Parse(s)
+
 let getSheetId (fileName : string) (sheetName : string) =
     let partUri = "/xl/workbook.xml"
     let xPath = (sprintf "//*[name()='sheet' and @name='%s']" sheetName)
     getPart fileName xPath partUri
     |> Seq.head
     |> fun x -> 
-        let xn s = XName.Get(s)
-        let xd = XDocument.Parse(x)
-        xd.Root.Attribute(xn "sheetId").Value
+        (xd x).Root.Attribute(xn "sheetId").Value
 

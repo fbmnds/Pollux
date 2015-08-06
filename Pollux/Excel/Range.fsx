@@ -8,8 +8,6 @@
 
 
 open System.Xml
-open System.Xml.Linq
-open System.Xml.XPath
 
 open System.IO.Packaging
 
@@ -25,21 +23,27 @@ open Pollux.Excel.Utils
 let ``Cost Summary2.xlsx`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2.xlsx"
 let ``file6000rows``       = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows.xlsx"
 
-    
 
 do
-    use workbook = new Workbook (``Cost Summary2.xlsx``, false)
-    let sheet = Sheet (workbook, "Übersicht", false)
+    let sheet = Sheet (``Cost Summary2.xlsx``, "Übersicht", false)
     printfn "%A" sheet.UpperLeft
     printfn "%A" sheet.LowerRight
+    //sheet.Cells() |> Map.iter (fun k v -> printfn "%s:\n %A" k v)
+    //sheet.CellFormats |> Map.iter (fun k v -> printfn "%d:\n %A" k v)
+    printfn "--------"
     sheet.Values
     |> Array2D.iteri (fun i j x -> 
         if x <> CellContent.Empty then 
             printfn "%s %A" (convertIndex i j) x)
 
 do
-    use workbook = new Workbook (``Cost Summary2.xlsx``, false)
-    let sheet = Sheet (workbook, "CheckSums", false)
+    let partUri = "/xl/styles.xml"
+    let xPath = "//*[name()='cellXfs']/*[name()='xf']"
+    getPart ``Cost Summary2.xlsx`` xPath partUri
+    |> Seq.iter (printfn "%A")
+
+do
+    let sheet = Sheet (``Cost Summary2.xlsx``, "CheckSums", false)
     printfn "%A" sheet.UpperLeft
     printfn "%A" sheet.LowerRight
     sheet.Values
@@ -49,8 +53,7 @@ do
             printfn "%s %A" (convertIndex (i + i') (j + j')) x)
 
 do
-    use workbook = new Workbook (``Cost Summary2.xlsx``, false)
-    let sheet = Sheet (workbook, "CheckSums2", false)
+    let sheet = Sheet (``Cost Summary2.xlsx``, "CheckSums2", false)
     printfn "%A" sheet.UpperLeft
     printfn "%A" sheet.LowerRight
     sheet.Values
@@ -60,8 +63,7 @@ do
             printfn "%s %A" (convertIndex (i + i') (j + j')) x)
 
 do
-    use workbook = new Workbook (``Cost Summary2.xlsx``, false)
-    let sheet = Sheet (workbook, "CheckSums", false)
+    let sheet = Sheet (``Cost Summary2.xlsx``, "CheckSums", false)
     let range' : Range = 
         {  Name = "Cost Summary2.xlsx : CheckSums2"
            UpperLeft  = match sheet.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> convertLabel
@@ -71,8 +73,7 @@ do
     |> fun x -> printfn "%A %A %A" x.CheckSums x.CheckResults x.CheckErrors
 
 do
-    use workbook = new Workbook (``Cost Summary2.xlsx``, false)
-    let sheet = Sheet (workbook, "CheckSums2", false)
+    let sheet = Sheet (``Cost Summary2.xlsx``, "CheckSums2", false)
     let range' : Range = 
         {  Name = "Cost Summary2.xlsx : CheckSums2"
            UpperLeft  = match sheet.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> convertLabel
@@ -82,8 +83,7 @@ do
     |> fun x -> printfn "%A %A %A" x.CheckSums x.CheckResults x.CheckErrors
 
 do
-    use workbook = new Workbook (``Cost Summary2.xlsx``, false)
-    let sheet = Sheet (workbook, "CheckSums", false)
+    let sheet = Sheet (``Cost Summary2.xlsx``, "CheckSums", false)
     let range' : Range = 
         {  Name = "Cost Summary2.xlsx : CheckSums"
            UpperLeft  = match sheet.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> convertLabel
@@ -93,8 +93,7 @@ do
     |> fun x -> printfn "%A %A %A" x.CheckSums x.CheckResults x.CheckErrors
 
 do
-    use workbook = new Workbook (``Cost Summary2.xlsx``, false)
-    let sheet = Sheet (workbook, "CheckSums2", false)
+    let sheet = Sheet (``Cost Summary2.xlsx``, "CheckSums2", false)
     let range' : Range = 
         {  Name = "Cost Summary2.xlsx : CheckSums2"
            UpperLeft  = match sheet.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> convertLabel

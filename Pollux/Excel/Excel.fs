@@ -1,9 +1,11 @@
 ﻿namespace Pollux
 
 namespace Pollux.Excel
+   
 #if INTERACTIVE
     open Pollux.Excel.Utils
 #endif
+
     type private SpreadsheetDocument'   = DocumentFormat.OpenXml.Packaging.SpreadsheetDocument
     type private WorksheetPart'         = DocumentFormat.OpenXml.Packaging.WorksheetPart
     //type private SharedStringTablePart' = DocumentFormat.OpenXml.Packaging.SharedStringTablePart
@@ -17,6 +19,7 @@ namespace Pollux.Excel
     //type private SharedStringTable'     = DocumentFormat.OpenXml.Spreadsheet.SharedStringTable
     type private SharedStringItem'      = DocumentFormat.OpenXml.Spreadsheet.SharedStringItem
     type private NumberingFormat'       = DocumentFormat.OpenXml.Spreadsheet.NumberingFormat
+
 
     type Index = RowIndex*ColIndex
     and RowIndex = int
@@ -68,20 +71,32 @@ namespace Pollux.Excel
     | Decimal           of decimal
     | Date              of System.DateTime
     | Empty          
-
-
-    type Cell = 
+    and Cell = 
         { CellValue          : string 
           InlineString       : string
           CellFormula        : string
           ExtensionList      : string 
           CellMetadataIndex  : string
           ShowPhonetic       : string
-          Reference          : CellIndex
+          Reference          : string
           StyleIndex         : string
           CellDataType       : string
           ValueMetadataIndex : string }
-
+    and NumberFormat = 
+        { NumberFormatId : string
+          FormatCode     : string }
+    and CellFormat = 
+// https://msdn.microsoft.com/en-us/library/documentformat.openxml.spreadsheet.cellformats(v=office.14).aspx
+        { NumFmtId          : string
+          BorderId          : string
+          FillId            : string
+          FontId            : string
+          ApplyAlignment    : string
+          ApplyBorder       : string
+          ApplyFont         : string
+          XfId              : string 
+          ApplyNumberFormat : string }
+          // Alignment as subtype
 
     type Range =
         { mutable Name : string 
@@ -211,103 +226,115 @@ namespace Pollux.Excel
         member x.CheckErrors = checkErrors ()
         member x.Eps with get() = eps and set(e) = eps <- e
 
-
-    type Workbook (fileName : string, editable: bool) =
-        
+    
+    // for backward compatibility
+    type Workbook (fileName : string, editable: bool) =        
         let fileFullName = FileFullName(fileName).Value
-        let sheetDocument = SpreadsheetDocument'.Open(fileFullName, editable)
-
-        let workbookPart = sheetDocument.WorkbookPart
-
-        member x.WorkbookPart = workbookPart
         member x.FileFullName = fileFullName
 
-        interface System.IDisposable with 
-            member x.Dispose() = sheetDocument.Dispose()
       
-
-    type Sheet (workbook : Workbook, sheetName: string, editable: bool) =
+    type Sheet (fileName : string, sheetName: string, editable: bool) =
         let sheetName = sheetName
-        
-        let workbookPart = workbook.WorkbookPart
-        let sheet =
-            workbookPart.Workbook.Descendants<Sheet'>()
-            |> Seq.filter (fun sheet -> sheet.Name.InnerText = sheetName)
-            |> Seq.head
-        let sharedStringTable = workbookPart.SharedStringTablePart.SharedStringTable
-        let sharedStringItems = sharedStringTable.Elements<SharedStringItem'>()
+
+        let cells = 
+            let partUri = sprintf "/xl/worksheets/sheet%s.xml" (getSheetId fileName sheetName)
+            let xPath = "//*[name()='c']"
+            getPart fileName xPath partUri
+            |> Seq.map (fun x -> 
+                let test name = 
+                    let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
+                    if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
+                let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
+                let xa s = test' ((xd x).Root.Attribute(xn s))
+                { CellValue          = test "v";
+                  InlineString       = test "is"
+                  CellFormula        = test "f";
+                  ExtensionList      = test "extLst"; 
+                  CellMetadataIndex  = xa "cm";
+                  ShowPhonetic       = xa "ph";
+                  Reference          = xa "r";
+                  StyleIndex         = xa "s";
+                  CellDataType       = xa "t";
+                  ValueMetadataIndex = xa "vm" })
+            |> Seq.map (fun x -> x.Reference, x )
+            |> Seq.sort
+            |> Map.ofSeq
+
+        //let sharedStringTable = workbookPart.SharedStringTablePart.SharedStringTable
+        //let sharedStringItems = sharedStringTable.Elements<SharedStringItem'>()
         let mutable ranges : Range list = []
         
-        let worksheet = (workbookPart.GetPartById(sheet.Id.Value) :?> WorksheetPart').Worksheet
-        let rows = worksheet.Descendants<Row'>() |> Array.ofSeq
-        let cols = worksheet.Descendants<Column'>() |> Array.ofSeq
-        let upperLeft, lowerRight, cells = 
-            let cells : Map<CellIndex, Cell'> ref = ref Map.empty
-            rows
-            |> Array.map (fun row -> 
-                row.Elements<Cell'>()                
-                |> Seq.filter (fun cell -> isNotNull cell)
-                |> Seq.map (fun cell -> (convertLabel cell.CellReference.Value), cell)
-                |> Array.ofSeq)
-            |> Array.concat  // unique cell indices
-            |> fun cells' ->
-                if cells'.Length = 0 then Index(0,0), Index(0,0), !cells 
-                else
-                    let upperLeft', lowerRight' = ref (fst cells'.[0]), ref (fst cells'.[0])
-                    cells'
-                    |> Array.iter (fun ((i,j), c) ->
-                        upperLeft'  := (min (fst !upperLeft')  i), (min (snd !upperLeft')  j)
-                        lowerRight' := (max (fst !lowerRight') i), (max (snd !lowerRight') j)
-                        cells := (!cells).Add (Index(i,j), c))
-                    Index(!upperLeft'), Index(!lowerRight'), !cells
+        let rows = []
+        let cols = []
+        let upperLeft, lowerRight, keys =
+            if cells.Count = 0 then Index(0,0), Index(0,0), Seq.empty
+            else
+                let keys = cells |> Map.toSeq |> Seq.map (fun (k,_) -> convertLabel k)
+                let x,y = keys |> Seq.map (fun (i,_) -> i), keys |> Seq.map (fun (_,j) -> j)
+                Index((Seq.min x),(Seq.min y)), Index((Seq.max x),(Seq.max y)), keys |> Seq.map (fun x -> Index(x))
 
-        let cellFormats = 
-            workbookPart.WorkbookStylesPart.Stylesheet.CellFormats.Descendants<CellFormat'>() |> Array.ofSeq
+        let numberFormats, cellFormats = 
+            let partUri = "/xl/styles.xml"
+            let numberFormats = 
+                let xPath = "//*[name()='numFmt']"
+                getPart fileName xPath partUri
+                |> Seq.map (fun x -> 
+                    let test' (x: System.Xml.Linq.XAttribute) = if (isNull x || isNull x.Value) then "" else x.Value
+                    let xa s = test' ((xd x).Root.Attribute(xn s))
+                    { NumberFormatId = xa "numFmtId"; FormatCode = xa "formatCode" })
+            let cellFormats = 
+                let xPath = "//*[name()='cellXfs']/*[name()='xf']"
+                getPart fileName xPath partUri
+                |> Seq.mapi (fun i x ->                 
+                    let test' (x: System.Xml.Linq.XAttribute) = if (isNull x || isNull x.Value) then "" else x.Value
+                    let xa s = test' ((xd x).Root.Attribute(xn s))
+                    i,
+                    { NumFmtId          = xa "numFmtId";
+                      BorderId          = xa "borderId"
+                      FillId            = xa "fillId";
+                      FontId            = xa "fontId"; 
+                      ApplyAlignment    = xa "applyAlignment";
+                      ApplyBorder       = xa "applyBorder";
+                      ApplyFont         = xa "applyFont";
+                      XfId              = xa "xfId";
+                      ApplyNumberFormat = xa "applyNumberFormat" })                             
+                |> Map.ofSeq
+            numberFormats, cellFormats
 
         let mutable cellDateTimeFormats = 
-            cellFormats   
-            |> Array.mapi (fun i x -> 
-                workbookPart.WorkbookStylesPart.Stylesheet.NumberingFormats.Descendants<NumberingFormat'>() 
-                |> Array.ofSeq
-                |> Array.filter (fun x -> x.FormatCode.Value |> isDateTime)
-                |> Array.map (fun x -> x.NumberFormatId.Value)
-                |> Array.append builtInDateTimeNumberFormatIDs 
-                |> Array.map (fun y -> y = x.NumberFormatId.Value) 
-                |> Array.fold (fun x' y' -> x' || y') false, i, x)
-            |> Array.filter (fun (b, _,_) -> b)
-            |> Array.map (fun (_, i, x) -> i, x.NumberFormatId.Value)
-            |> Map.ofArray
+            numberFormats   
+            |> Seq.filter (fun x -> x.FormatCode |> isDateTime)
+            |> Seq.map (fun x -> x.NumberFormatId)
+            |> Seq.append builtInDateTimeNumberFormatIDs 
+        
+        let isCellDateTimeFormat x =
+            if cellFormats.ContainsKey (x) then 
+                cellDateTimeFormats
+                |> Seq.filter (fun x' -> x' = (cellFormats.[x]).NumFmtId)
+                |> Seq.isEmpty
+                |> not
+            else false
 
         let values =
-        // https://stackoverflow.com/questions/19034805/how-to-distinguish-inline-numbers-from-ole-automation-date-numbers-in-openxml-sp/19582685
-            let values = 
-                let a,a' = match lowerRight with | Index(i,j) -> i,j | Label x -> x |> convertLabel 
-                let b,b' = match upperLeft  with | Index(i,j) -> i,j | Label x -> x |> convertLabel 
-                array2D [| for _ in [0 ..(a-b)] do 
-                                yield [ for _ in [0 .. (a'-b')] do yield CellContent.Empty ] |]
-            rows
-            |> Array.iteri (fun i row -> 
-                    row.Elements<Cell'>() 
-                    |> Seq.iteri (fun j x -> 
-                        if isNull x then 
-                            values.[i,j] <- CellContent.Empty
-                        else
-                            if isNotNull x.DataType then
-                                if  x.DataType.Value = CellValues'.SharedString then 
-                                    values.[i,j] <- CellContent.StringTableIndex (int32 (x.CellValue.Text))
-                                else failwith (sprintf "Data type not covered %A %A" (x.DataType.Value) (x.CellValue.Text))  
-                            else 
-                                if isNull x.CellValue then
-                                    values.[i,j] <- CellContent.Empty
-                                else
-                                    if isNull x.StyleIndex then
-                                        values.[i,j] <- CellContent.Decimal(decimal(x.CellValue.Text))
-                                    else
-                                        if cellDateTimeFormats.ContainsKey (int x.StyleIndex.Value) then 
-                                            values.[i,j] <- CellContent.Date(fromJulianDate (int64 (decimal x.CellValue.Text)))
-                                        else 
-                                            values.[i,j] <- CellContent.Decimal(decimal(x.CellValue.Text))))                            
-            values
+            let a,a' = Sheet.ConvertCellIndex2 lowerRight
+            let b,b' = Sheet.ConvertCellIndex2 upperLeft 
+            let evaluate i j =
+                let index = convertIndex (i+b) (j+b')
+                if cells.ContainsKey(index) then
+                    let x = cells.[index]
+                    //printfn "%A %A" (Label(convertIndex i j)) x
+                    if x.InlineString <> "" then CellContent.InlineString (x.InlineString)
+                    else if x.CellDataType = "s" then CellContent.StringTableIndex (int32 (x.CellValue))
+                    else if x.CellValue <> "" then 
+                        if x.StyleIndex <> "" && isCellDateTimeFormat (int x.StyleIndex) then 
+                            CellContent.Date(fromJulianDate (int64 (decimal x.CellValue)))
+                        else CellContent.Decimal(decimal(x.CellValue))
+                    else CellContent.Empty
+                else CellContent.Empty
+            array2D [| for i in [0 .. (a-b)] do 
+                            yield [ for j in [0 .. (a'-b')] do yield (evaluate i j) ] |]
+
+        new (workbook : Workbook, sheetName: string, editable: bool) = Sheet (workbook.FileFullName, sheetName , editable)
 
         member x.Rows = rows
         member x.Cols = cols
@@ -341,3 +368,9 @@ namespace Pollux.Excel
         static member ConvertCellIndex = function
             | Label label -> Index (convertLabel label)
             | Index (x,y) -> Label (convertIndex x y)
+
+        static member ConvertCellIndex2 = function
+            | Label label -> convertLabel label
+            | Index (x,y) -> x,y
+
+        member x.CellFormats = cellFormats
