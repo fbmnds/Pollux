@@ -113,8 +113,8 @@ let inline getPart (log : Pollux.Log.ILogger)
 let inline getPart1 (log : Pollux.Log.ILogger) 
                    (fileName : string) (xPath : string) (partUri : string) f = 
     log.LogLine Pollux.Log.LogLevel.Info 
-        "Beginning 'getPart2' with xPath %s, partUri %s" xPath partUri
-    let result = new ResizeArray<'T>()
+        "Beginning 'getPart1' with xPath %s, partUri %s" xPath partUri
+    //let result = new ResizeArray<'T>()
     use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
     let part = 
         xlsx.GetParts()
@@ -133,11 +133,13 @@ let inline getPart1 (log : Pollux.Log.ILogger)
                     while nodes.MoveNext() do
                         yield (f !i nodes.Current.OuterXml)
                         i := !i+1 
-                | _ -> failwith <| sprintf "'getPart2': unexpected XPath-Expression return type '%A'" expression.ReturnType
+                        if !i % 50000 = 0 then printfn "* %d" !i
+                        if !i > 5000000 then printfn "* %d" !i
+                | _ -> failwith <| sprintf "'getPart1': unexpected XPath-Expression return type '%A'" expression.ReturnType
         |]
     //|> Seq.iteri (fun i x -> result.Add((f i x)))
     log.LogLine Pollux.Log.LogLevel.Info 
-        "'getPart2' with xPath %s, partUri %s finished" xPath partUri
+        "'getPart1' with xPath %s, partUri %s finished" xPath partUri
     result
 
 let inline getPart2 (log : Pollux.Log.ILogger) 
