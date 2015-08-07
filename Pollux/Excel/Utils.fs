@@ -88,8 +88,7 @@ let inline id2 (i: int) (x: 'T) = x
 let inline getPart (log : Pollux.Log.ILogger) 
                    (fileName : string) (xPath : string) (partUri : string) f = 
     log.LogLine Pollux.Log.LogLevel.Info 
-        "Beginning getPart with xPath %s, partUri %s" xPath partUri
-    //let result = new ResizeArray<'T>()
+        "Beginning 'getPart' with xPath %s, partUri %s" xPath partUri
     use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
     let part = 
         xlsx.GetParts()
@@ -101,7 +100,6 @@ let inline getPart (log : Pollux.Log.ILogger)
     let manager = new XmlNamespaceManager(navigator.NameTable)
     let expression = XPathExpression.Compile(xPath, manager)
     let i = ref 0
-    //let result = 
     match expression.ReturnType with
         | XPathResultType.NodeSet -> 
             let nodes = navigator.Select(expression)
@@ -109,11 +107,38 @@ let inline getPart (log : Pollux.Log.ILogger)
                 f !i nodes.Current.OuterXml
                 i := !i+1 
         | _ -> failwith <| sprintf "'getPart': unexpected XPath-Expression return type '%A'" expression.ReturnType
-    
-    //|> Seq.iteri (fun i x -> result.Add((f i x)))
     log.LogLine Pollux.Log.LogLevel.Info 
         "'getPart' with xPath %s, partUri %s finished" xPath partUri
-    //result
+
+let inline getPart1 (log : Pollux.Log.ILogger) 
+                   (fileName : string) (xPath : string) (partUri : string) f = 
+    log.LogLine Pollux.Log.LogLevel.Info 
+        "Beginning 'getPart2' with xPath %s, partUri %s" xPath partUri
+    let result = new ResizeArray<'T>()
+    use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
+    let part = 
+        xlsx.GetParts()
+        |> Seq.filter (fun x -> x.Uri.ToString() = partUri)
+        |> Seq.head
+    use stream = part.GetStream(System.IO.FileMode.Open, System.IO.FileAccess.Read)
+    let xml = new XPathDocument(stream)
+    let navigator = xml.CreateNavigator()
+    let manager = new XmlNamespaceManager(navigator.NameTable)
+    let expression = XPathExpression.Compile(xPath, manager)
+    let i = ref 0
+    let result = 
+        [| match expression.ReturnType with
+                | XPathResultType.NodeSet -> 
+                    let nodes = navigator.Select(expression)
+                    while nodes.MoveNext() do
+                        yield (f !i nodes.Current.OuterXml)
+                        i := !i+1 
+                | _ -> failwith <| sprintf "'getPart2': unexpected XPath-Expression return type '%A'" expression.ReturnType
+        |]
+    //|> Seq.iteri (fun i x -> result.Add((f i x)))
+    log.LogLine Pollux.Log.LogLevel.Info 
+        "'getPart2' with xPath %s, partUri %s finished" xPath partUri
+    result
 
 let inline getPart2 (log : Pollux.Log.ILogger) 
                    (fileName : string) (xPath : string) (partUri : string) f = 
@@ -155,3 +180,4 @@ let getSheetId (log : Pollux.Log.ILogger) (fileName : string) (sheetName : strin
     |> Seq.head
     |> fun x -> 
         (xd x).Root.Attribute(xn "sheetId").Value
+

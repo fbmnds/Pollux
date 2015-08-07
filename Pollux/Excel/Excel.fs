@@ -246,7 +246,8 @@ namespace Pollux.Excel
         let fileFullName = FileFullName(fileName).Value
         member x.FileFullName = fileFullName
 
-      
+
+
     type Sheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
         let sheetName = sheetName
         //let logInfo  = log.LogLine Pollux.Log.LogLevel.Info 
@@ -254,7 +255,7 @@ namespace Pollux.Excel
         let inlineString  = ref (System.Collections.Generic.Dictionary<int,string>())
         let cellFormula   = ref (System.Collections.Generic.Dictionary<int,string>())
         let extensionList = ref (System.Collections.Generic.Dictionary<int,string>())
-        let cells = System.Collections.Generic.Dictionary<int*int, Cell ref>()
+        //let cells = System.Collections.Generic.Dictionary<int*int,Cell>(10000000)
 
         let fCell i x = 
             let test name = 
@@ -289,25 +290,15 @@ namespace Pollux.Excel
                   StyleIndex         = test3 "s"  
                   CellDataType       = if (xa "t") = "" then ' ' else ((xa "t").ToCharArray()).[0]
                   ValueMetadataIndex = test3 "vm" })
-            |> fun x -> 
-                if (fst x) <> (-1,-1) && (cells.ContainsKey(fst x) |> not) then cells.Add((fst x), (ref (snd x)))
-
-
-        do
+            //|> fun ((row,col),cell) -> cells.[(row,col)] <- cell
+        
+        let cells =
             let partUri = sprintf "/xl/worksheets/sheet%s.xml" (getSheetId log fileName sheetName)
             let xPath = "//*[name()='c']"
             log.LogLine Pollux.Log.LogLevel.Info 
                 "Reading cells from %s, sheet %s in part %s:" fileName sheetName partUri
-            getPart log fileName xPath partUri fCell
-            
-//            |> fun x -> 
-//                
-//                log.LogLine Pollux.Log.LogLevel.Info "%s" "Building cell dict ..." 
-//                let d = System.Collections.Generic.Dictionary<int*int, Cell>()
-//                for k, v in x do 
-//                    if k <> (-1,-1) && (d.ContainsKey(k) |> not) then d.Add(k, v)
-//                log.LogLine Pollux.Log.LogLevel.Info "%s" "Cell dict finished."
-//                d
+            getPart1 log fileName xPath partUri fCell
+            |> dict
 
         //let sharedStringTable = workbookPart.SharedStringTablePart.SharedStringTable
         //let sharedStringItems = sharedStringTable.Elements<SharedStringItem'>()
@@ -319,7 +310,7 @@ namespace Pollux.Excel
         let upperLeft, lowerRight, keys =
             log.LogLine Pollux.Log.LogLevel.Info 
                 "%s" "Beginning with upperLeft, lowerRight, keys ..." 
-            let keys = cells.Keys 
+            let keys = cells.Keys
             let minX,maxX,minY,maxY =
                 keys 
                 |> Seq.fold (fun (minX,maxX,minY,maxY) (x,y) -> 
@@ -386,13 +377,13 @@ namespace Pollux.Excel
                 let index = ((i+b),(j+b'))
                 if cells.ContainsKey(index) then
                     let x = cells.[index]
-                    if (!x).InlineString > -1 then CellContent.InlineString (!x).InlineString
-                    else if (!x).CellDataType = 's' then 
-                        CellContent.StringTableIndex (int (!x).CellValue)
-                    else if (!x).isCellValueValid then 
-                        if (!x).StyleIndex > -1 && isCellDateTimeFormat (!x).StyleIndex then 
-                            CellContent.Date(fromJulianDate (int64 (!x).CellValue))
-                        else CellContent.Decimal((!x).CellValue)
+                    if x.InlineString > -1 then CellContent.InlineString x.InlineString
+                    else if x.CellDataType = 's' then 
+                        CellContent.StringTableIndex (int x.CellValue)
+                    else if x.isCellValueValid then 
+                        if x.StyleIndex > -1 && isCellDateTimeFormat x.StyleIndex then 
+                            CellContent.Date(fromJulianDate (int64 x.CellValue))
+                        else CellContent.Decimal(x.CellValue)
                     else CellContent.Empty
                 else CellContent.Empty
             array2D [| for i in [0 .. (a-b)] do 
