@@ -67,23 +67,36 @@ namespace Pollux.Excel
         
 
     type CellContent =
-    | StringTableIndex  of int32
-    | InlineString      of string
+    | StringTableIndex  of int
+    | InlineString      of int
     | Decimal           of decimal
     | Date              of System.DateTime
     | Empty          
-    and Cell = 
-        { CellValue          : string 
-          InlineString       : string
-          CellFormula        : string
-          ExtensionList      : string 
-          CellMetadataIndex  : string
-          ShowPhonetic       : string
-          Reference          : string
-          StyleIndex         : string
-          CellDataType       : string
-          ValueMetadataIndex : string }
-    and NumberFormat = 
+    
+    [<CustomEquality; NoComparison; CLIMutable>]
+    type Cell = 
+        { isCellValueValid   : bool
+          CellValue          : decimal
+          InlineString       : int
+          CellFormula        : int
+          ExtensionList      : int
+          CellMetadataIndex  : int
+          ShowPhonetic       : int
+          ReferenceRow       : int
+          ReferenceCol       : int
+          StyleIndex         : int
+          CellDataType       : char
+          ValueMetadataIndex : int }
+
+        override x.GetHashCode() = (x.ReferenceRow, x.ReferenceCol).GetHashCode()
+
+        override x.Equals(y) =
+            match y with
+            | :? Cell as y -> x.ReferenceRow = y.ReferenceRow && x.ReferenceCol = y.ReferenceCol
+            | _ -> invalidArg (sprintf "'%A'" y) "is not comparable to CellIndex."
+
+    
+    type NumberFormat = 
         { NumberFormatId : string
           FormatCode     : string }
     and CellFormat = 
@@ -238,38 +251,63 @@ namespace Pollux.Excel
         let sheetName = sheetName
         //let logInfo  = log.LogLine Pollux.Log.LogLevel.Info 
         //let logError = log.LogLine Pollux.Log.LogLevel.Error
-        let fCell x = 
+        let inlineString  = ref (System.Collections.Generic.Dictionary<int,string>())
+        let cellFormula   = ref (System.Collections.Generic.Dictionary<int,string>())
+        let extensionList = ref (System.Collections.Generic.Dictionary<int,string>())
+        let cells = System.Collections.Generic.Dictionary<int*int, Cell ref>()
+
+        let fCell i x = 
             let test name = 
                 let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
                 if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
             let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
             let xa s = test' ((xd x).Root.Attribute(xn s))
-            { CellValue          = test "v";
-              InlineString       = test "is"
-              CellFormula        = test "f";
-              ExtensionList      = test "extLst"; 
-              CellMetadataIndex  = xa "cm";
-              ShowPhonetic       = xa "ph";
-              Reference          = xa "r";
-              StyleIndex         = xa "s";
-              CellDataType       = xa "t";
-              ValueMetadataIndex = xa "vm" }
-        let cells = 
+            let test2 x (y: System.Collections.Generic.Dictionary<int,string>)  = 
+                let z = test x
+                if z = "" then -1 
+                else y.Add (i, z); i
+            let test3 (x: string) = if (xa x) = "" then -1 else x |> xa |> int
+            let cv, cvb =     
+                if "" = test "v" then -1M,false
+                else
+                    try (test "v" |> decimal),true
+                    with | _ -> 
+                        log.LogLine Pollux.Log.LogLevel.Info "fCell: ignoring invalid cell '%s'" x
+                        -1M,false
+            let rR = xa "r"  |> convertLabel |> fst
+            let rC = xa "r"  |> convertLabel |> snd
+            ((rR,rC),
+                { isCellValueValid   = cvb
+                  CellValue          = cv
+                  InlineString       = test2 "is" !inlineString
+                  CellFormula        = test2 "f" !cellFormula
+                  ExtensionList      = test2 "extLst" !extensionList
+                  CellMetadataIndex  = test3 "cm"
+                  ShowPhonetic       = test3 "ph" 
+                  ReferenceRow       = rR
+                  ReferenceCol       = rC
+                  StyleIndex         = test3 "s"  
+                  CellDataType       = if (xa "t") = "" then ' ' else ((xa "t").ToCharArray()).[0]
+                  ValueMetadataIndex = test3 "vm" })
+            |> fun x -> 
+                if (fst x) <> (-1,-1) && (cells.ContainsKey(fst x) |> not) then cells.Add((fst x), (ref (snd x)))
+
+
+        do
             let partUri = sprintf "/xl/worksheets/sheet%s.xml" (getSheetId log fileName sheetName)
             let xPath = "//*[name()='c']"
             log.LogLine Pollux.Log.LogLevel.Info 
                 "Reading cells from %s, sheet %s in part %s:" fileName sheetName partUri
             getPart log fileName xPath partUri fCell
-            |> fun x -> 
-                log.LogLine Pollux.Log.LogLevel.Info 
-                    "%s" "Parsing finished,  reorg seq ..."  
-                x |> Seq.map (fun x -> x.Reference, x ) 
-            |> fun x -> 
-                log.LogLine Pollux.Log.LogLevel.Info 
-                    "%s" "Reorg finished,  building cell dict ..."
-                let d = System.Collections.Generic.Dictionary<string, Cell>((x |> Seq.length),HashIdentity.Structural)
-                for k, v in x do d.Add(k, v)
-                d
+            
+//            |> fun x -> 
+//                
+//                log.LogLine Pollux.Log.LogLevel.Info "%s" "Building cell dict ..." 
+//                let d = System.Collections.Generic.Dictionary<int*int, Cell>()
+//                for k, v in x do 
+//                    if k <> (-1,-1) && (d.ContainsKey(k) |> not) then d.Add(k, v)
+//                log.LogLine Pollux.Log.LogLevel.Info "%s" "Cell dict finished."
+//                d
 
         //let sharedStringTable = workbookPart.SharedStringTablePart.SharedStringTable
         //let sharedStringItems = sharedStringTable.Elements<SharedStringItem'>()
@@ -280,8 +318,8 @@ namespace Pollux.Excel
 
         let upperLeft, lowerRight, keys =
             log.LogLine Pollux.Log.LogLevel.Info 
-                "%s" "cell dict ready, beginning with upperLeft, lowerRight, keys ..." 
-            let keys = cells.Keys |> Seq.map convertLabel
+                "%s" "Beginning with upperLeft, lowerRight, keys ..." 
+            let keys = cells.Keys 
             let minX,maxX,minY,maxY =
                 keys 
                 |> Seq.fold (fun (minX,maxX,minY,maxY) (x,y) -> 
@@ -295,7 +333,7 @@ namespace Pollux.Excel
             let partUri = "/xl/styles.xml"
             let numberFormats = 
                 let xPath = "//*[name()='numFmt']"
-                getPart log fileName xPath partUri id
+                getPart2 log fileName xPath partUri id2
                 |> Seq.map (fun x -> 
                     let test' (x: System.Xml.Linq.XAttribute) = 
                         if (isNull x || isNull x.Value) then "" else x.Value
@@ -305,7 +343,7 @@ namespace Pollux.Excel
                 "%s" "numberFormats finished,  beginning with cellFormats ..."
             let cellFormats = 
                 let xPath = "//*[name()='cellXfs']/*[name()='xf']"
-                getPart log fileName xPath partUri id
+                getPart2 log fileName xPath partUri id2
                 |> Seq.mapi (fun i x ->                 
                     let test' (x: System.Xml.Linq.XAttribute) = 
                         if (isNull x || isNull x.Value) then "" else x.Value
@@ -340,19 +378,21 @@ namespace Pollux.Excel
             else false
 
         let values =
-            log.LogLine Pollux.Log.LogLevel.Info "%s" "Building values ..."
+            log.LogLine Pollux.Log.LogLevel.Info 
+                "%s" "Building values ..."
             let a,a' = Sheet.ConvertCellIndex2 lowerRight
             let b,b' = Sheet.ConvertCellIndex2 upperLeft 
             let evaluate i j =
-                let index = convertIndex (i+b) (j+b')
+                let index = ((i+b),(j+b'))
                 if cells.ContainsKey(index) then
                     let x = cells.[index]
-                    if x.InlineString <> "" then CellContent.InlineString (x.InlineString)
-                    else if x.CellDataType = "s" then CellContent.StringTableIndex (int32 (x.CellValue))
-                    else if x.CellValue <> "" then 
-                        if x.StyleIndex <> "" && isCellDateTimeFormat (int x.StyleIndex) then 
-                            CellContent.Date(fromJulianDate (int64 (decimal x.CellValue)))
-                        else CellContent.Decimal(decimal(x.CellValue))
+                    if (!x).InlineString > -1 then CellContent.InlineString (!x).InlineString
+                    else if (!x).CellDataType = 's' then 
+                        CellContent.StringTableIndex (int (!x).CellValue)
+                    else if (!x).isCellValueValid then 
+                        if (!x).StyleIndex > -1 && isCellDateTimeFormat (!x).StyleIndex then 
+                            CellContent.Date(fromJulianDate (int64 (!x).CellValue))
+                        else CellContent.Decimal((!x).CellValue)
                     else CellContent.Empty
                 else CellContent.Empty
             array2D [| for i in [0 .. (a-b)] do 

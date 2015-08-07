@@ -127,7 +127,7 @@ module Basics =
         RangeWithCheckSumsRow (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
         |> fun (x,y,z) -> 
-            //should (equalWithin 0.000001) sums x,
+            should (equalWithin 0.000001) sums x,
             should equal results y,
             should equal errors z
         |> ignore
