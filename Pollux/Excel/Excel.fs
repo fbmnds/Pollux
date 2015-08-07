@@ -236,36 +236,37 @@ namespace Pollux.Excel
       
     type Sheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
         let sheetName = sheetName
-        // let logInfo () = log.LogLine Pollux.Log.LogLevel.Info 
+        //let logInfo  = log.LogLine Pollux.Log.LogLevel.Info 
         //let logError = log.LogLine Pollux.Log.LogLevel.Error
+        let fCell x = 
+            let test name = 
+                let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
+                if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
+            let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
+            let xa s = test' ((xd x).Root.Attribute(xn s))
+            { CellValue          = test "v";
+              InlineString       = test "is"
+              CellFormula        = test "f";
+              ExtensionList      = test "extLst"; 
+              CellMetadataIndex  = xa "cm";
+              ShowPhonetic       = xa "ph";
+              Reference          = xa "r";
+              StyleIndex         = xa "s";
+              CellDataType       = xa "t";
+              ValueMetadataIndex = xa "vm" }
         let cells = 
-            let partUri = sprintf "/xl/worksheets/sheet%s.xml" (getSheetId fileName sheetName)
+            let partUri = sprintf "/xl/worksheets/sheet%s.xml" (getSheetId log fileName sheetName)
             let xPath = "//*[name()='c']"
-            log.LogLine Pollux.Log.LogLevel.Info "Reading cells from %s, sheet %s in part %s:" fileName sheetName partUri
-            getPart fileName xPath partUri
+            log.LogLine Pollux.Log.LogLevel.Info 
+                "Reading cells from %s, sheet %s in part %s:" fileName sheetName partUri
+            getPart log fileName xPath partUri fCell
             |> fun x -> 
-                log.LogLine Pollux.Log.LogLevel.Info "%s" ("getPart finished, parsing ...")  
-                x |> Seq.map (fun x -> 
-                    let test name = 
-                        let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
-                        if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
-                    let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
-                    let xa s = test' ((xd x).Root.Attribute(xn s))
-                    { CellValue          = test "v";
-                      InlineString       = test "is"
-                      CellFormula        = test "f";
-                      ExtensionList      = test "extLst"; 
-                      CellMetadataIndex  = xa "cm";
-                      ShowPhonetic       = xa "ph";
-                      Reference          = xa "r";
-                      StyleIndex         = xa "s";
-                      CellDataType       = xa "t";
-                      ValueMetadataIndex = xa "vm" })
-            |> fun x -> 
-                log.LogLine Pollux.Log.LogLevel.Info "%s" "Parsing finished,  reorg seq ..."  
+                log.LogLine Pollux.Log.LogLevel.Info 
+                    "%s" "Parsing finished,  reorg seq ..."  
                 x |> Seq.map (fun x -> x.Reference, x ) 
             |> fun x -> 
-                log.LogLine Pollux.Log.LogLevel.Info "%s" "Reorg finished,  building cell dict ..."
+                log.LogLine Pollux.Log.LogLevel.Info 
+                    "%s" "Reorg finished,  building cell dict ..."
                 let d = System.Collections.Generic.Dictionary<string, Cell>((x |> Seq.length),HashIdentity.Structural)
                 for k, v in x do d.Add(k, v)
                 d
@@ -277,39 +278,37 @@ namespace Pollux.Excel
         let rows = []
         let cols = []
 
-//        let upperLeft, lowerRight, keys =
-//            log.LogLine Pollux.Log.LogLevel.Info "%s" "Reorg finished,  beginning with upperLeft, lowerRight, keys ..." 
-//            if cells |> Seq.isEmpty then Index(0,0), Index(0,0), Seq.empty
-//            else
-//                let keys = cells |> Seq.map (fun (k,_) -> convertLabel k) 
-//                let x,y = keys |> Seq.map (fun (i,_) -> i), keys |> Seq.map (fun (_,j) -> j)
-//                Index((Seq.min x),(Seq.min y)), Index((Seq.max x),(Seq.max y)), keys |> Seq.map (fun x -> Index(x))
-
         let upperLeft, lowerRight, keys =
-            log.LogLine Pollux.Log.LogLevel.Info "%s" "cell dict ready, beginning with upperLeft, lowerRight, keys ..." 
+            log.LogLine Pollux.Log.LogLevel.Info 
+                "%s" "cell dict ready, beginning with upperLeft, lowerRight, keys ..." 
             let keys = cells.Keys |> Seq.map convertLabel
             let minX,maxX,minY,maxY =
                 keys 
-                |> Seq.fold (fun (minX,maxX,minY,maxY) (x,y) -> min x minX, max x maxX, min y minY, max y maxY) (System.Int32.MaxValue,System.Int32.MinValue,System.Int32.MaxValue,System.Int32.MinValue)
+                |> Seq.fold (fun (minX,maxX,minY,maxY) (x,y) -> 
+                    min x minX, max x maxX, min y minY, max y maxY) 
+                    (System.Int32.MaxValue,System.Int32.MinValue,System.Int32.MaxValue,System.Int32.MinValue)
             Index(minX, minY), Index(maxX,maxY), keys |> Seq.map (fun x -> Index(x))
 
-
         let numberFormats, cellFormats = 
-            log.LogLine Pollux.Log.LogLevel.Info "%s" "upperLeft, lowerRight, keys finished,  beginning with numberFormats ..."
+            log.LogLine Pollux.Log.LogLevel.Info 
+                "%s" "upperLeft, lowerRight, keys finished,  beginning with numberFormats ..."
             let partUri = "/xl/styles.xml"
             let numberFormats = 
                 let xPath = "//*[name()='numFmt']"
-                getPart fileName xPath partUri
+                getPart log fileName xPath partUri id
                 |> Seq.map (fun x -> 
-                    let test' (x: System.Xml.Linq.XAttribute) = if (isNull x || isNull x.Value) then "" else x.Value
+                    let test' (x: System.Xml.Linq.XAttribute) = 
+                        if (isNull x || isNull x.Value) then "" else x.Value
                     let xa s = test' ((xd x).Root.Attribute(xn s))
                     { NumberFormatId = xa "numFmtId"; FormatCode = xa "formatCode" })
-            log.LogLine Pollux.Log.LogLevel.Info "%s" "numberFormats finished,  beginning with cellFormats ..."
+            log.LogLine Pollux.Log.LogLevel.Info 
+                "%s" "numberFormats finished,  beginning with cellFormats ..."
             let cellFormats = 
                 let xPath = "//*[name()='cellXfs']/*[name()='xf']"
-                getPart fileName xPath partUri
+                getPart log fileName xPath partUri id
                 |> Seq.mapi (fun i x ->                 
-                    let test' (x: System.Xml.Linq.XAttribute) = if (isNull x || isNull x.Value) then "" else x.Value
+                    let test' (x: System.Xml.Linq.XAttribute) = 
+                        if (isNull x || isNull x.Value) then "" else x.Value
                     let xa s = test' ((xd x).Root.Attribute(xn s))
                     i,
                     { NumFmtId          = xa "numFmtId";
@@ -325,7 +324,8 @@ namespace Pollux.Excel
             numberFormats, cellFormats
 
         let mutable cellDateTimeFormats = 
-            log.LogLine Pollux.Log.LogLevel.Info "%s" "cellFormats finished,  beginning with cellDateTimeFormats ..."
+            log.LogLine Pollux.Log.LogLevel.Info 
+                "%s" "cellFormats finished,  beginning with cellDateTimeFormats ..."
             numberFormats   
             |> Seq.filter (fun x -> x.FormatCode |> isDateTime)
             |> Seq.map (fun x -> x.NumberFormatId)

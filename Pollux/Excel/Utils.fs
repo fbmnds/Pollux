@@ -83,8 +83,10 @@ let inline toJulianDate (x : System.DateTime) =
     (x.ToBinary() - 599264352000000000L) / 864000000000L
 
 
-let getPart (fileName : string) (xPath : string) (partUri : string) = 
-    printfn "%s Beginning getPart with xPath %s, partUri %s" (Pollux.Log.now()) xPath partUri
+let inline getPart (log : Pollux.Log.ILogger) (fileName : string) (xPath : string) (partUri : string) f = 
+    log.LogLine Pollux.Log.LogLevel.Info 
+        "Beginning getPart with xPath %s, partUri %s" xPath partUri
+    let result = new ResizeArray<'T>()
     use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
     let part = 
         xlsx.GetParts()
@@ -95,28 +97,24 @@ let getPart (fileName : string) (xPath : string) (partUri : string) =
     let navigator = xml.CreateNavigator()
     let manager = new XmlNamespaceManager(navigator.NameTable)
     let expression = XPathExpression.Compile(xPath, manager)
-    let result = 
-        seq { 
-            match expression.ReturnType with
-            | XPathResultType.NodeSet -> 
-                let nodes = navigator.Select(expression)
-                while nodes.MoveNext() do
-                    yield nodes.Current.OuterXml
-            | _ -> failwith <| sprintf "XPath-Expression return type %A not implemented" expression.ReturnType
-        } |> Seq.cache
-    stream.Dispose()
-    xlsx.Close()
-    printfn "%s getPart with xPath %s, partUri %s finished" (Pollux.Log.now()) xPath partUri
+    match expression.ReturnType with
+    | XPathResultType.NodeSet -> 
+        let nodes = navigator.Select(expression)
+        while nodes.MoveNext() do
+            result.Add (f nodes.Current.OuterXml)
+    | _ -> failwith <| sprintf "XPath-Expression return type %A not implemented" expression.ReturnType
+    log.LogLine Pollux.Log.LogLevel.Info 
+        "getPart with xPath %s, partUri %s finished" xPath partUri
     result
 
 
 let xn s = System.Xml.Linq.XName.Get(s)
 let xd s = System.Xml.Linq.XDocument.Parse(s)
 
-let getSheetId (fileName : string) (sheetName : string) =
+let getSheetId (log : Pollux.Log.ILogger) (fileName : string) (sheetName : string) =
     let partUri = "/xl/workbook.xml"
     let xPath = (sprintf "//*[name()='sheet' and @name='%s']" sheetName)
-    getPart fileName xPath partUri
+    getPart (log : Pollux.Log.ILogger) fileName xPath partUri id
     |> Seq.head
     |> fun x -> 
         (xd x).Root.Attribute(xn "sheetId").Value

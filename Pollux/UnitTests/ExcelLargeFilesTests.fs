@@ -10,10 +10,10 @@ module LargeFiles =
     open Pollux.Excel.Utils    
 
     let ``file6000rows.xlsx``  = __SOURCE_DIRECTORY__ + @"\data\file6000rows.xlsx"
-    let ``file6000rows_1.txt``  = __SOURCE_DIRECTORY__ + @"\data\file6000rows_1.txt"
+    let ``file6000rows_1.txt`` = __SOURCE_DIRECTORY__ + @"\data\file6000rows_1.txt"
 
     let sheetRandom = Sheet (``file6000rows.xlsx``, "Random", false)
-
+(*
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeFiles : file6000rows.xlsx : UpperLeft``() =
         sheetRandom.UpperLeft |> should equal (Index(0,0))
@@ -32,5 +32,5 @@ module LargeFiles =
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``file6000rows_1.txt``))
-
+*)
 
