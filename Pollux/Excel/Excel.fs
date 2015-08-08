@@ -289,7 +289,6 @@ namespace Pollux.Excel
                   StyleIndex         = test3 "s"  
                   CellDataType       = if (xa "t") = "" then ' ' else ((xa "t").ToCharArray()).[0]
                   ValueMetadataIndex = test3 "vm" })
-            //|> fun ((row,col),cell) -> cells.[(row,col)] <- cell
         
         let cells =
             let partUri = sprintf "/xl/worksheets/sheet%s.xml" (getSheetId log fileName sheetName)
@@ -297,6 +296,7 @@ namespace Pollux.Excel
             log.LogLine Pollux.Log.LogLevel.Info 
                 "Reading cells from %s, sheet %s in part %s:" fileName sheetName partUri
             getPart1 log fileName xPath partUri fCell
+            |> dict
 
         //let sharedStringTable = workbookPart.SharedStringTablePart.SharedStringTable
         //let sharedStringItems = sharedStringTable.Elements<SharedStringItem'>()
@@ -308,13 +308,13 @@ namespace Pollux.Excel
         let upperLeft, lowerRight, keys =
             log.LogLine Pollux.Log.LogLevel.Info 
                 "%s" "Beginning with upperLeft, lowerRight, keys ..." 
-            let keys = cells |> Array.map (fun x -> fst x)
+            let keys = cells.Keys
             let minX,maxX,minY,maxY =
                 keys 
-                |> Array.fold (fun (minX,maxX,minY,maxY) (x,y) -> 
+                |> Seq.fold (fun (minX,maxX,minY,maxY) (x,y) -> 
                     min x minX, max x maxX, min y minY, max y maxY) 
                     (System.Int32.MaxValue,System.Int32.MinValue,System.Int32.MaxValue,System.Int32.MinValue)
-            Index(minX, minY), Index(maxX,maxY), keys |> Array.map (fun x -> Index(x))
+            Index(minX, minY), Index(maxX,maxY), keys |> Seq.map (fun x -> Index(x))
 
         let numberFormats, cellFormats = 
             log.LogLine Pollux.Log.LogLevel.Info 
@@ -371,29 +371,22 @@ namespace Pollux.Excel
                 "%s" "Building values ..."
             let a,a' = Sheet.ConvertCellIndex2 lowerRight
             let b,b' = Sheet.ConvertCellIndex2 upperLeft 
-            let evaluate (x' : (int*int)*Cell) =
-                //let i,j,x = (fst (fst x'))+b, (snd (fst x'))+b', (snd x')
-                //let index = ((i+b),(j+b'))
-                
-                let x = snd x'
-                if x.InlineString > -1 then CellContent.InlineString x.InlineString
-                else if x.CellDataType = 's' then 
-                    CellContent.StringTableIndex (int x.CellValue)
-                else if x.isCellValueValid then 
-                    if x.StyleIndex > -1 && isCellDateTimeFormat x.StyleIndex then 
-                        CellContent.Date(fromJulianDate (int64 x.CellValue))
-                    else CellContent.Decimal(x.CellValue)
+            let evaluate i j =
+                let index = i+b, j+b'
+                if cells.ContainsKey(index) then
+                    let x = cells.[index]
+                    if x.InlineString > -1 then CellContent.InlineString x.InlineString
+                    else if x.CellDataType = 's' then 
+                        CellContent.StringTableIndex (int x.CellValue)
+                    else if x.isCellValueValid then 
+                        if x.StyleIndex > -1 && isCellDateTimeFormat x.StyleIndex then 
+                            CellContent.Date(fromJulianDate (int64 x.CellValue))
+                        else CellContent.Decimal(x.CellValue)
+                    else CellContent.Empty
                 else CellContent.Empty
-            let values = 
-                array2D [| for _ in [0 .. (a-b)] do 
-                                yield [ for _ in [0 .. (a'-b')] do 
-                                            yield CellContent.Empty ] |]
-            cells
-            |> Array.iter (fun x' -> 
-                let i,j = (fst (fst x')), (snd (fst x')) 
-                try values.[i-b,j-b'] <- (evaluate x')
-                with _ -> log.LogLine Pollux.Log.LogLevel.Info " * failed on cell %A" x')
-            values
+            array2D [| for i in [0 .. (a-b)] do 
+                            yield [ for j in [0 .. (a'-b')] do 
+                                       yield (evaluate i j) ] |]
 
         new (workbook : Workbook, sheetName: string, editable: bool) = 
             Sheet (((new Pollux.Log.PseudoLogger()) :> Pollux.Log.ILogger), workbook.FileFullName, sheetName , editable)

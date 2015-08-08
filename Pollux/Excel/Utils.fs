@@ -133,8 +133,6 @@ let inline getPart1 (log : Pollux.Log.ILogger)
                     while nodes.MoveNext() do
                         yield (f !i nodes.Current.OuterXml)
                         i := !i+1 
-                        if !i % 50000 = 0 then printfn "* %d" !i
-                        if !i > 5000000 then printfn "* %d" !i
                 | _ -> failwith <| sprintf "'getPart1': unexpected XPath-Expression return type '%A'" expression.ReturnType
         |]
     //|> Seq.iteri (fun i x -> result.Add((f i x)))
