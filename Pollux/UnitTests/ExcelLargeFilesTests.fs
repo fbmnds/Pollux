@@ -12,7 +12,7 @@ module LargeFiles =
     let ``file6000rows.xlsx``  = __SOURCE_DIRECTORY__ + @"\data\file6000rows.xlsx"
     let ``file6000rows_1.txt`` = __SOURCE_DIRECTORY__ + @"\data\file6000rows_1.txt"
 
-    let sheetRandom = Sheet (``file6000rows.xlsx``, "Random", false)
+    //let sheetRandom = Sheet (``file6000rows.xlsx``, "Random", false)
 (*
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeFiles : file6000rows.xlsx : UpperLeft``() =

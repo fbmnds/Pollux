@@ -295,7 +295,7 @@ namespace Pollux.Excel
             let xPath = "//*[name()='c']"
             log.LogLine Pollux.Log.LogLevel.Info 
                 "Reading cells from %s, sheet %s in part %s:" fileName sheetName partUri
-            getPart1 log fileName xPath partUri fCell
+            getPart1 log fileName partUri fCell
             |> dict
 
         //let sharedStringTable = workbookPart.SharedStringTablePart.SharedStringTable

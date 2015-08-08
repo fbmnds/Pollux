@@ -1,5 +1,4 @@
 ﻿
-
 [<AutoOpen>]
 module Pollux.Excel.Utils
 
@@ -110,7 +109,34 @@ let inline getPart (log : Pollux.Log.ILogger)
     log.LogLine Pollux.Log.LogLevel.Info 
         "'getPart' with xPath %s, partUri %s finished" xPath partUri
 
+
 let inline getPart1 (log : Pollux.Log.ILogger) 
+                   (fileName : string) (partUri : string) f = 
+    log.LogLine Pollux.Log.LogLevel.Info 
+        "Beginning 'getPart1' with partUri %s" partUri
+    use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
+    let part = 
+        xlsx.GetParts()
+        |> Seq.filter (fun x -> x.Uri.ToString() = partUri)
+        |> Seq.head
+    use stream = part.GetStream(System.IO.FileMode.Open, System.IO.FileAccess.Read)
+    use reader = XmlReader.Create(stream)
+    let i = ref 0
+    let result = 
+        while (reader.MoveToContent() = XmlNodeType.Element) && (reader.Name <> "c") do ()
+        [|              
+            yield (f !i (reader.ReadOuterXml()));
+            while reader.ReadToFollowing("c") do
+                if reader.Name = "c" then
+                    i := !i + 1
+                    yield  (f !i (reader.ReadOuterXml()))
+        |]
+    log.LogLine Pollux.Log.LogLevel.Info 
+        "'getPart1' with partUri %s finished" partUri
+    result
+
+
+let inline getPart1' (log : Pollux.Log.ILogger) 
                    (fileName : string) (xPath : string) (partUri : string) f = 
     log.LogLine Pollux.Log.LogLevel.Info 
         "Beginning 'getPart1' with xPath %s, partUri %s" xPath partUri
