@@ -7,7 +7,9 @@ module Basics =
 
 
     open Pollux.Excel
-    open Pollux.Excel.Utils    
+    open Pollux.Excel.Utils   
+    open Pollux.Excel.Range
+ 
 
     let ``Cost Summary2.xlsx``  = __SOURCE_DIRECTORY__ + @"\data\Cost Summary2.xlsx"
     let ``Cost Summary2_1.txt`` = __SOURCE_DIRECTORY__ + @"\data\Cost Summary2_1.txt"
@@ -21,15 +23,15 @@ module Basics =
 
     [<Test; Category "Pollux.Excel.Utils">]
     let ``Excel : Utils : ColumnLabel``() =
-        [0; 7] |> List.map ColumnLabel |> should equal ["A"; "H"]
+        [0; 7] |> List.map CellIndex.ColumnLabel |> should equal ["A"; "H"]
 
     [<Test; Category "Pollux.Excel.Utils">]
     let ``Excel : Utils : ColumnIndex``() =
-        ["A"; "H"] |> List.map ColumnIndex |> should equal [0; 7]
+        ["A"; "H"] |> List.map CellIndex.ColumnIndex |> should equal [0; 7]
 
     [<Test; Category "Pollux.Excel.Utils">]
     let ``Excel : Utils : convertLabel``() =
-        ["A1"; "H29"] |> List.map convertLabel |> should equal [(0,0); (28,7)]
+        ["A1"; "H29"] |> List.map CellIndex.ConvertLabel |> should equal [(0,0); (28,7)]
 
     [<Test; Category "Pollux.Excel.Utils">]
     let ``Excel : Utils : convertIndex2``() =
@@ -104,7 +106,7 @@ module Basics =
                UpperLeft  = sheet2.UpperLeft.ToTuple
                LowerRight = sheet2.LowerRight.ToTuple
                Values = sheet2.Values }
-        RangeWithCheckSumsRow (range')
+        Pollux.Excel.Range.RangeWithCheckSumsRow (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
         |> fun (x,y,z) -> 
             should (equalWithin 0.000001) sums x,

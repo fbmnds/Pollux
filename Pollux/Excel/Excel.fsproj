@@ -50,7 +50,9 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="Log.fs" />
+    <Compile Include="Types.fs" />
     <Compile Include="Utils.fs" />
+    <Compile Include="Range.fs" />
     <Compile Include="Excel.fs" />
     <None Include="Range.fsx" />
     <None Include="Xml.IO.fsx" />

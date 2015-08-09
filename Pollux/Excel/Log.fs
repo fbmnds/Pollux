@@ -74,7 +74,7 @@ type ConsoleLogger() =
 
 
 /// ILogger do-not-log implementation
-type PseudoLogger() =
+type DefaultLogger() =
   interface ILogger with
     member x.Log level format = Printf.kprintf (fun s -> ()) format
     member x.LogLine level format = Printf.kprintf (fun s -> ()) format

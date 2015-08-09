@@ -18,7 +18,7 @@ let main argv =
     let ``file6000rows.xlsx`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows.xlsx"
 
     
-    let sheet = Sheet ((new ConsoleLogger()), ``file6000rows.xlsx``, "Random", false)
+    let sheet = Sheet ((new ConsoleLogger() :> ILogger), ``file6000rows.xlsx``, "Random", false)
     Pollux.Log.logInfo "%A" sheet.UpperLeft
     let x = System.Console.ReadKey() 
     0

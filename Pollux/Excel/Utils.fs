@@ -1,6 +1,7 @@
 ﻿
-[<AutoOpen>]
+
 module Pollux.Excel.Utils
+
 
 open FParsec
 
@@ -10,52 +11,13 @@ open System.Xml.XPath
 
 open System.IO.Packaging
 
+
 let inline isNull x = x = Unchecked.defaultof<_>
 let inline isNotNull x = x |> isNull |> not
-
 let inline (|IsNull|) x = isNull x 
     
-       
-type FileFullName (fileName) =
-    member x.Value = System.IO.FileInfo(fileName).FullName 
 
-
-let inline ColumnLabel columnIndex =
-    let rec loop dividend col = 
-        if dividend > 0 then
-            let modulo = (dividend - 1) % 26
-            System.Convert.ToChar(65 + modulo).ToString() + col
-            |> loop ((dividend - modulo) / 26) 
-        else 
-            col
-    loop (columnIndex + 1) ""
-
-
-let inline ColumnIndex (columnLabel: string) =
-    columnLabel.ToUpper().ToCharArray()
-    |> Array.map int
-    |> Array.fold (fun (value, i, k)  c ->
-        let alphabetIndex = c - 64
-        if k = 0 then
-            (value + alphabetIndex - 1, i + 1, k - 1)
-        else
-            if alphabetIndex = 0 then
-                (value + (26 * k), i + 1, k - 1)
-            else
-                (value + (alphabetIndex * 26 * k), i + 1, k - 1)
-        ) (0, 0, (columnLabel.Length - 1))
-    |> fun (value,_,_) -> value 
-
-
-let inline convertLabel (label : string) =
-    tuple2 (many1Satisfy  isLetter) (many1Satisfy  isDigit)
-    |> fun x -> run x (label.ToUpper())
-    |> function
-    | Success (x, _, _) ->  System.Int32.Parse(snd x) - 1, ColumnIndex (fst x)
-    | _ -> failwith (sprintf "Invalid CellIndex '%s'" label)
-
-
-let inline convertIndex x y = sprintf "%s%d" (ColumnLabel y) (x + 1)
+let inline convertIndex x y = sprintf "%s%d" (CellIndex.ColumnLabel y) (x + 1)
 let inline convertIndex2 (x : int*int) = convertIndex (fst x) (snd x)
 
 
@@ -207,3 +169,39 @@ let getSheetId (log : Pollux.Log.ILogger) (fileName : string) (sheetName : strin
     |> fun x -> 
         (xd x).Root.Attribute(xn "sheetId").Value
 
+
+let setCell i x (log : #Pollux.Log.ILogger)
+    (inlineString: Dict<int,string> ref) (cellFormula: Dict<int,string> ref ) (extensionList: Dict<int,string> ref) = 
+    let info = Pollux.Log.LogLevel.Info
+    let test name = 
+        let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
+        if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
+    let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
+    let xa s = test' ((xd x).Root.Attribute(xn s))
+    let test2 x (y: Dict<int,string>)  = 
+        let z = test x
+        if z = "" then -1 
+        else y.Add (i, z); i
+    let test3 (x: string) = if (xa x) = "" then -1 else x |> xa |> int
+    let cv, cvb =     
+        if "" = test "v" then -1M,false
+        else
+            try (test "v" |> decimal),true
+            with | _ -> 
+                log.LogLine info "setCell: ignoring invalid cell '%s'" x
+                -1M,false
+    let rR = xa "r"  |> CellIndex.ConvertLabel |> fst
+    let rC = xa "r"  |> CellIndex.ConvertLabel |> snd
+    ((rR,rC),
+        {   isCellValueValid   = cvb
+            CellValue          = cv
+            InlineString       = test2 "is" !inlineString
+            CellFormula        = test2 "f" !cellFormula
+            ExtensionList      = test2 "extLst" !extensionList
+            CellMetadataIndex  = test3 "cm"
+            ShowPhonetic       = test3 "ph" 
+            ReferenceRow       = rR
+            ReferenceCol       = rC
+            StyleIndex         = test3 "s"  
+            CellDataType       = if (xa "t") = "" then ' ' else ((xa "t").ToCharArray()).[0]
+            ValueMetadataIndex = test3 "vm" })
