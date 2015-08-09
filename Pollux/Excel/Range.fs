@@ -36,7 +36,7 @@ module Range =
 
         new (range : Range) =
             let defaultConversion = function
-            | StringTableIndex _ | Date _ | InlineString _ | Empty  -> 0M
+            | StringTableIndex _ | Date _ | InlineString _ | Pending | Empty  -> 0M
             | Decimal x -> x
             let range' : DecimalRange = 
                 {  Name = range.Name
@@ -92,7 +92,7 @@ module Range =
 
         new (range : Range) =
             let defaultConversion = function
-            | StringTableIndex _ | Date _ | InlineString _ | Empty -> 0M
+            | StringTableIndex _ | Date _ | InlineString _ | Pending | Empty -> 0M
             | Decimal x -> x
             let range' : DecimalRange = 
                 {  Name = range.Name

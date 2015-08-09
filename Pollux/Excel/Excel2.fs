@@ -2,7 +2,7 @@
 
     open Pollux.Excel.Utils
 
-    type Sheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
+    type LargeSheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
         let sheetName = sheetName
         let logInfo format = log.LogLine Pollux.Log.LogLevel.Info format
         let logError format = log.LogLine Pollux.Log.LogLevel.Error format
@@ -105,10 +105,10 @@
                                        yield (evaluate i j) ] |]
 
         new (workbook : Workbook, sheetName: string, editable: bool) = 
-            Sheet (new Pollux.Log.DefaultLogger(), workbook.FileFullName, sheetName , editable)
+            LargeSheet (new Pollux.Log.DefaultLogger(), workbook.FileFullName, sheetName , editable)
 
         new (fileName : string, sheetName: string, editable: bool) = 
-            Sheet (new Pollux.Log.DefaultLogger(), fileName, sheetName , editable)
+            LargeSheet (new Pollux.Log.DefaultLogger(), fileName, sheetName , editable)
 
         static member ConvertCellIndex = function
             | Label label -> Index (CellIndex.ConvertLabel label)
