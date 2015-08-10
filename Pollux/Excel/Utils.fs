@@ -58,63 +58,38 @@ let inline toJulianDate (x : System.DateTime) =
 
 let inline id2 (i: int) (x: 'T) = x
 
-let inline getPart (log : Pollux.Log.ILogger) 
-                   (fileName : string) (xPath : string) (partUri : string) f = 
-    log.LogLine Pollux.Log.LogLevel.Info 
-        "Beginning 'getPart' with xPath %s, partUri %s" xPath partUri
-    use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
-    let part = 
-        xlsx.GetParts()
-        |> Seq.filter (fun x -> x.Uri.ToString() = partUri)
-        |> Seq.head
-    use stream = part.GetStream(System.IO.FileMode.Open, System.IO.FileAccess.Read)
-    let xml = new XPathDocument(stream)
-    let navigator = xml.CreateNavigator()
-    let manager = new XmlNamespaceManager(navigator.NameTable)
-    let expression = XPathExpression.Compile(xPath, manager)
-    let i = ref 0
-    match expression.ReturnType with
-        | XPathResultType.NodeSet -> 
-            let nodes = navigator.Select(expression)
-            while nodes.MoveNext() do
-                f !i nodes.Current.OuterXml
-                i := !i+1 
-        | _ -> failwith <| sprintf "'getPart': unexpected XPath-Expression return type '%A'" expression.ReturnType
-    log.LogLine Pollux.Log.LogLevel.Info 
-        "'getPart' with xPath %s, partUri %s finished" xPath partUri
+//let inline getPart (log : Pollux.Log.ILogger) 
+//                   (fileName : string) (xPath : string) (partUri : string) f = 
+//    log.LogLine Pollux.Log.LogLevel.Info 
+//        "Beginning 'getPart' with xPath %s, partUri %s" xPath partUri
+//    use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
+//    let part = 
+//        xlsx.GetParts()
+//        |> Seq.filter (fun x -> x.Uri.ToString() = partUri)
+//        |> Seq.head
+//    use stream = part.GetStream(System.IO.FileMode.Open, System.IO.FileAccess.Read)
+//    let xml = new XPathDocument(stream)
+//    let navigator = xml.CreateNavigator()
+//    let manager = new XmlNamespaceManager(navigator.NameTable)
+//    let expression = XPathExpression.Compile(xPath, manager)
+//    let i = ref 0
+//    match expression.ReturnType with
+//        | XPathResultType.NodeSet -> 
+//            let nodes = navigator.Select(expression)
+//            while nodes.MoveNext() do
+//                f !i nodes.Current.OuterXml
+//                i := !i+1 
+//        | _ -> failwith <| sprintf "'getPart': unexpected XPath-Expression return type '%A'" expression.ReturnType
+//    log.LogLine Pollux.Log.LogLevel.Info 
+//        "'getPart' with xPath %s, partUri %s finished" xPath partUri
 
 
-let inline getPart1 (log : Pollux.Log.ILogger) 
-                   (fileName : string) (partUri : string) f = 
-    log.LogLine Pollux.Log.LogLevel.Info 
-        "Beginning 'getPart1' with partUri %s" partUri
-    use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
-    let part = 
-        xlsx.GetParts()
-        |> Seq.filter (fun x -> x.Uri.ToString() = partUri)
-        |> Seq.head
-    use stream = part.GetStream(System.IO.FileMode.Open, System.IO.FileAccess.Read)
-    use reader = XmlReader.Create(stream)
-    let i = ref 0
-    let result = 
-        while (reader.MoveToContent() = XmlNodeType.Element) && (reader.Name <> "c") do ()
-        [|              
-            yield (f !i (reader.ReadOuterXml()));
-            while reader.ReadToFollowing("c") do
-                if reader.Name = "c" then
-                    i := !i + 1
-                    yield  (f !i (reader.ReadOuterXml()))
-        |]
-    log.LogLine Pollux.Log.LogLevel.Info 
-        "'getPart1' with partUri %s finished" partUri
-    result
 
 
 let inline getPart1' (log : Pollux.Log.ILogger) 
                    (fileName : string) (xPath : string) (partUri : string) f = 
     log.LogLine Pollux.Log.LogLevel.Info 
-        "Beginning 'getPart1' with xPath %s, partUri %s" xPath partUri
-    //let result = new ResizeArray<'T>()
+        "Beginning 'getPart1\'' with xPath %s, partUri %s" xPath partUri
     use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
     let part = 
         xlsx.GetParts()
@@ -133,18 +108,16 @@ let inline getPart1' (log : Pollux.Log.ILogger)
                     while nodes.MoveNext() do
                         yield (f !i nodes.Current.OuterXml)
                         i := !i+1 
-                | _ -> failwith <| sprintf "'getPart1': unexpected XPath-Expression return type '%A'" expression.ReturnType
+                | _ -> failwith <| sprintf "'getPart1\'': unexpected XPath-Expression return type '%A'" expression.ReturnType
         |]
-    //|> Seq.iteri (fun i x -> result.Add((f i x)))
     log.LogLine Pollux.Log.LogLevel.Info 
-        "'getPart1' with xPath %s, partUri %s finished" xPath partUri
+        "'getPart1\'' with xPath %s, partUri %s finished" xPath partUri
     result
 
 let inline getPart2 (log : Pollux.Log.ILogger) 
                    (fileName : string) (xPath : string) (partUri : string) f = 
     log.LogLine Pollux.Log.LogLevel.Info 
         "Beginning 'getPart2' with xPath %s, partUri %s" xPath partUri
-    //let result = new ResizeArray<'T>()
     use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
     let part = 
         xlsx.GetParts()
@@ -165,7 +138,6 @@ let inline getPart2 (log : Pollux.Log.ILogger)
                         i := !i+1 
                 | _ -> failwith <| sprintf "'getPart2': unexpected XPath-Expression return type '%A'" expression.ReturnType
         }
-    //|> Seq.iteri (fun i x -> result.Add((f i x)))
     log.LogLine Pollux.Log.LogLevel.Info 
         "'getPart2' with xPath %s, partUri %s finished" xPath partUri
     result
@@ -253,3 +225,41 @@ let setCell2 i x (log : #Pollux.Log.ILogger) (values: CellContent [,] ref)
             StyleIndex         = test3 "s"  
             CellDataType       = if (xa "t") = "" then ' ' else ((xa "t").ToCharArray()).[0]
             ValueMetadataIndex = test3 "vm" })
+
+let setCell3 i x (log : #Pollux.Log.ILogger) (source: char [] ref) (values: CellContent [,] ref)
+    (inlineString: Dict<int,string> ref) (cellFormula: Dict<int,string> ref ) (extensionList: Dict<int,string> ref) = 
+    let info = Pollux.Log.LogLevel.Info
+    let test name = 
+        let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
+        if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
+    let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
+    let xa s = test' ((xd x).Root.Attribute(xn s))
+    let test2 x (y: Dict<int,string>)  = 
+        let z = test x
+        if z = "" then -1 
+        else y.Add (i, z); i
+    let test3 (x: string) = if (xa x) = "" then -1 else x |> xa |> int
+    let cv, cvb =     
+        if "" = test "v" then -1M,false
+        else
+            try (test "v" |> decimal),true
+            with | _ -> 
+                log.LogLine info "setCell: ignoring invalid cell '%s'" x
+                -1M,false
+    let rR = xa "r"  |> CellIndex.ConvertLabel |> fst
+    let rC = xa "r"  |> CellIndex.ConvertLabel |> snd
+    ((rR,rC),
+        {   isCellValueValid   = cvb
+            CellValue          = cv
+            InlineString       = test2 "is" !inlineString
+            CellFormula        = test2 "f" !cellFormula
+            ExtensionList      = test2 "extLst" !extensionList
+            CellMetadataIndex  = test3 "cm"
+            ShowPhonetic       = test3 "ph" 
+            ReferenceRow       = rR
+            ReferenceCol       = rC
+            StyleIndex         = test3 "s"  
+            CellDataType       = if (xa "t") = "" then ' ' else ((xa "t").ToCharArray()).[0]
+            ValueMetadataIndex = test3 "vm" })
+
+

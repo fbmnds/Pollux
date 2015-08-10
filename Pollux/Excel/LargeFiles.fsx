@@ -25,7 +25,7 @@ open Pollux.Excel.Utils
 open Pollux.Excel.Range
 
 let log = (new ConsoleLogger() :> ILogger)
-log
+
 
 let ``file6000rows.xlsx`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows.xlsx"
 
@@ -41,31 +41,6 @@ let ``Cost Summary2_3.txt`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost
 let sheet = LargeSheet (``Cost Summary2.xlsx``, "Übersicht", false)
 let sheet2 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums", false)
 let sheet3 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums2", false)
-
-
-
-do
-    let range' : Range = 
-        {  Name = "Cost Summary2.xlsx : CheckSums"
-           UpperLeft  = sheet2.UpperLeft.ToTuple
-           LowerRight = sheet2.LowerRight.ToTuple
-           Values = sheet2.Values }
-    Pollux.Excel.Range.RangeWithCheckSumsRow (range')
-    |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
-    |> printfn "%A"
-    
-
-do
-    let sheet = Sheet (``Cost Summary2.xlsx``, "Übersicht", false)
-    printfn "%A" sheet.UpperLeft
-    printfn "%A" sheet.LowerRight
-    //sheet.Cells() |> Map.iter (fun k v -> printfn "%s:\n %A" k v)
-    //sheet.CellFormats |> Map.iter (fun k v -> printfn "%d:\n %A" k v)
-    printfn "--------"
-    sheet.Values
-    |> Array2D.iteri (fun i j x -> 
-        if x <> CellContent.Empty then 
-            printfn "%s %A" (convertIndex i j) x)
 
 
 let ``Ref Übersicht`` =
@@ -115,11 +90,11 @@ let work state =
         if x.cursor |> isEOF x.refS then EOF x.acc
         else if x.cursor |> isClose1 x.refS then 
             let cursor' = x.cursor + "/>".Length         
-            (!x.acc).Add(x.pos1,cursor')    
+            (!x.acc).Add(x.pos1,cursor')
             Search { cursor = cursor' ; pos1 = cursor'; acc = x.acc; refS = x.refS }
         else if x.cursor |> isClose2 x.refS then 
             let cursor' = x.cursor + "</c>".Length
-            (!x.acc).Add(x.pos1,cursor')
+            (!x.acc).Add(x.pos1,cursor') |> ignore
             Search { cursor = cursor' ; pos1 = cursor'; acc = x.acc; refS = x.refS }
         else
             Open1 { cursor = x.cursor + 1; pos1 = x.pos1; acc = x.acc; refS = x.refS }
@@ -127,7 +102,7 @@ let work state =
         if x.cursor |> isEOF x.refS then EOF x.acc
         else if x.cursor |> isClose2 x.refS then 
             let cursor' = x.cursor + "</c>".Length
-            (!x.acc).Add(x.pos1,cursor')
+            (!x.acc).Add(x.pos1,cursor') |> ignore
             Search { cursor = cursor' ; pos1 = cursor'; acc = x.acc  ; refS = x.refS }
         else
             Open2 { cursor = x.cursor + 1; pos1 = x.pos1; acc = x.acc; refS = x.refS }
@@ -140,17 +115,24 @@ let parse (xml: char [] ref) =
         | EOF acc -> acc
         | _ -> loop (work state)
     loop (Search { cursor = 0; pos1 = 0; acc = acc; refS = xml })
+    |> fun x ->
+        !x |> Seq.map (fun (x,y) -> new string([| for i in [x .. y-1] do yield (!xml).[i] |]))
 
 do
     parse ``Ref Übersicht``
-    |> printfn "%A"
+    |> Seq.iter (printfn "%s")
 
 do
     parse ``Ref Random``
-    |> printfn "%A"
+    |> Seq.take 5
+    |> Seq.iter (printfn "%s")
 
-//    {contents = seq [(859, 922); (922, 1016); (1016, 1061); (1075, 1120); ...];}
-//    Real: 00:09:45.977, CPU: 00:09:40.953, GC gen0: 152261, gen1: 8091, gen2: 6
+//    <c r="A1" s="2"><f ca="1">RANDBETWEEN(0,1000)</f><v>437</v></c>
+//    <c r="B1" s="2"><f t="shared" ref="B1:BM2" ca="1" si="0">RANDBETWEEN(0,1000)</f><v>358</v></c>
+//    <c r="C1" s="2"><f t="shared" ca="1" si="0"/>
+//    <c r="D1" s="2"><f t="shared" ca="1" si="0"/>
+//    <c r="E1" s="2"><f t="shared" ca="1" si="0"/>
+//    Real: 00:10:38.708, CPU: 00:10:23.234, GC gen0: 152262, gen1: 8093, gen2: 7
 //    val it : unit = ()
 //    > 
 

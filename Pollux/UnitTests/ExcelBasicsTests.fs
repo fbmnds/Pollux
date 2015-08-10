@@ -95,7 +95,7 @@ module Basics =
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_3.txt``))
 
     [<Test; Category "Pollux.Excel">]
-    let ``Excel : RangeWithCheckSumsRow : Values : 1``() =
+    let ``Excel : Sheet : RangeWithCheckSumsRow : Values : 1``() =
         let sums = 
             [| 13.3672806314049146233M; 13367M;                11141.3622010783753646M; 1597697566.19827133789M; 
                 12.488113967731764863M;  13.188791742120878768M; 14.942675417207984297M; 1597722128.54733421646M |]
@@ -115,7 +115,7 @@ module Basics =
         |> ignore
 
     [<Test; Category "Pollux.Excel">]
-    let ``Excel : RangeWithCheckSumsRow : Values : 2``() =
+    let ``Excel : Sheet : RangeWithCheckSumsRow : Values : 2``() =
         let sums = 
             [|13.2026490463963598333M; 13202M; 10960.4079130749648546M; 1590500864.48966096899M; 0M; 
               12.644524240156997028M; 14.374117698557430477M; 1592168954.47450327896M|] 
@@ -135,7 +135,7 @@ module Basics =
         |> ignore
 
     [<Test; Category "Pollux.Excel">]
-    let ``Excel : RangeWithCheckSumsCol : Values``() =
+    let ``Excel : Sheet : RangeWithCheckSumsCol : Values``() =
         let sums = 
             [|1473252699.186540358636202048M; 4977471.99940742972578226M;
               7824012.513421253072052329M; 7197049.16743033179056424M;
@@ -171,7 +171,7 @@ module Basics =
         |> ignore
 
     [<Test; Category "Pollux.Excel">]
-    let ``Excel : RangeWithCheckSumsCol : Values : conversion``() =
+    let ``Excel : Sheet : RangeWithCheckSumsCol : Values : conversion``() =
         let sums = 
             [|1473313582.337751886948653268M; 5038355.23136186733680412M; 7884896.291061025649325459M; 
               426188M; 4441062.53729317378630053M; 8055014.22107184628246402M; 780699.2911420647346315033M;
