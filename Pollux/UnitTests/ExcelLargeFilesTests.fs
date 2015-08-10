@@ -40,10 +40,9 @@ module LargeFiles =
     let ``Cost Summary2_2.txt`` = __SOURCE_DIRECTORY__ + @"\data\Cost Summary2_2.txt"
     let ``Cost Summary2_3.txt`` = __SOURCE_DIRECTORY__ + @"\data\Cost Summary2_3.txt"
 
-    let workbook = new Workbook (``Cost Summary2.xlsx``, false)
-    let sheet = LargeSheet (workbook, "Übersicht", false)
-    let sheet2 = LargeSheet (workbook, "CheckSums", false)
-    let sheet3 = LargeSheet (workbook, "CheckSums2", false)
+    let sheet = LargeSheet (``Cost Summary2.xlsx``, "Übersicht", false)
+    let sheet2 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums", false)
+    let sheet3 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums2", false)
 
         
     [<Test; Category "Pollux.Excel">]
@@ -73,8 +72,8 @@ module LargeFiles =
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : Values : 1``() =
         let i',j' = sheet.UpperLeft.ToTuple
-        [ for i in [0 .. sheet.Values.GetUpperBound(0)] do
-              for j in [0 .. sheet.Values.GetUpperBound(1)] do
+        [ for i in [0 .. (fst sheet.LowerRight.ToTuple)] do
+              for j in [0 .. (snd sheet.LowerRight.ToTuple)] do
                   yield if sheet.Values.[i,j] <> CellContent.Empty 
                         then sprintf "%s %A\r\n" (convertIndex (i+i') (j+j')) sheet.Values.[i,j]
                         else "" ]
@@ -84,8 +83,8 @@ module LargeFiles =
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : Values : 2``() =
         let i2',j2' = sheet2.UpperLeft.ToTuple
-        [ for i in [0 .. sheet2.Values.GetUpperBound(0)] do
-              for j in [0 .. sheet2.Values.GetUpperBound(1)] do
+        [ for i in [0 .. (fst sheet2.LowerRight.ToTuple)] do
+              for j in [0 .. (snd sheet2.LowerRight.ToTuple)] do
                   yield if sheet2.Values.[i,j] <> CellContent.Empty 
                         then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) sheet2.Values.[i,j];
                         else "" ]
@@ -95,8 +94,8 @@ module LargeFiles =
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : Values : 3``() =
         let i3',j3' = sheet3.UpperLeft.ToTuple
-        [ for i in [0 .. sheet3.Values.GetUpperBound(0)] do
-              for j in [0 .. sheet3.Values.GetUpperBound(1)] do
+        [ for i in [0 .. (fst sheet3.LowerRight.ToTuple)] do
+              for j in [0 .. (snd sheet3.LowerRight.ToTuple)] do
                   yield if sheet3.Values.[i,j] <> CellContent.Empty 
                         then sprintf "%s %A\r\n" (convertIndex (i+i3') (j+j3')) sheet3.Values.[i,j];
                         else "" ]

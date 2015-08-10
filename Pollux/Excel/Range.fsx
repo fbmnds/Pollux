@@ -5,8 +5,6 @@
 
 #r "System.Xml.Linq.dll"
 
-
-
 open System.Xml
 
 open System.IO.Packaging
@@ -14,15 +12,25 @@ open System.IO.Packaging
 #time;;
 fsi.AddPrinter(fun (x:XmlNode) -> x.OuterXml);;
 
+#load "Log.fs"
+#load "Types.fs"
 #load "Utils.fs"
+#load "Range.fs"
 #load "Excel.fs"
 
 open Pollux.Excel
 open Pollux.Excel.Utils
+open Pollux.Excel.Range
+
+let log = new Pollux.Log.ConsoleLogger()
 
 let ``Cost Summary2.xlsx`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2.xlsx"
 let ``file6000rows``       = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows.xlsx"
 
+do
+    CellIndex.ConvertLabel "APO6001"
+    |> printfn "%A"
+    // val it : int * int = (6000, 482)
 
 do
     let sheet = Sheet (``Cost Summary2.xlsx``, "Übersicht", false)
@@ -39,7 +47,7 @@ do
 do
     let partUri = "/xl/styles.xml"
     let xPath = "//*[name()='cellXfs']/*[name()='xf']"
-    getPart ``Cost Summary2.xlsx`` xPath partUri
+    getPart1' log ``Cost Summary2.xlsx`` xPath partUri id2
     |> Seq.iter (printfn "%A")
 
 do
@@ -48,7 +56,7 @@ do
     printfn "%A" sheet.LowerRight
     sheet.Values
     |> Array2D.iteri (fun i j x -> 
-        let i',j' = match sheet.UpperLeft  with | Index(i,j) -> i,j | Label x -> x |> convertLabel
+        let i',j' = match sheet.UpperLeft  with | Index(i,j) -> i,j | Label x -> x |> CellIndex.ConvertLabel
         if x <> CellContent.Empty then 
             printfn "%s %A" (convertIndex (i + i') (j + j')) x)
 
@@ -58,7 +66,7 @@ do
     printfn "%A" sheet.LowerRight
     sheet.Values
     |> Array2D.iteri (fun i j x -> 
-        let i',j' = match sheet.UpperLeft  with | Index(i,j) -> i,j | Label x -> x |> convertLabel
+        let i',j' = match sheet.UpperLeft  with | Index(i,j) -> i,j | Label x -> x |> CellIndex.ConvertLabel
         if x <> CellContent.Empty then 
             printfn "%s %A" (convertIndex (i + i') (j + j')) x)
 
@@ -66,8 +74,8 @@ do
     let sheet = Sheet (``Cost Summary2.xlsx``, "CheckSums", false)
     let range' : Range = 
         {  Name = "Cost Summary2.xlsx : CheckSums2"
-           UpperLeft  = match sheet.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> convertLabel
-           LowerRight = match sheet.LowerRight  with | Index(i,j) -> i,j | Label x -> x |> convertLabel
+           UpperLeft  = match sheet.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> CellIndex.ConvertLabel
+           LowerRight = match sheet.LowerRight  with | Index(i,j) -> i,j | Label x -> x |> CellIndex.ConvertLabel
            Values = sheet.Values }
     RangeWithCheckSumsRow (range')
     |> fun x -> printfn "%A %A %A" x.CheckSums x.CheckResults x.CheckErrors
@@ -76,8 +84,8 @@ do
     let sheet = Sheet (``Cost Summary2.xlsx``, "CheckSums2", false)
     let range' : Range = 
         {  Name = "Cost Summary2.xlsx : CheckSums2"
-           UpperLeft  = match sheet.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> convertLabel
-           LowerRight = match sheet.LowerRight  with | Index(i,j) -> i,j | Label x -> x |> convertLabel
+           UpperLeft  = match sheet.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> CellIndex.ConvertLabel
+           LowerRight = match sheet.LowerRight  with | Index(i,j) -> i,j | Label x -> x |> CellIndex.ConvertLabel
            Values = sheet.Values }
     RangeWithCheckSumsRow (range')
     |> fun x -> printfn "%A %A %A" x.CheckSums x.CheckResults x.CheckErrors
@@ -86,8 +94,8 @@ do
     let sheet = Sheet (``Cost Summary2.xlsx``, "CheckSums", false)
     let range' : Range = 
         {  Name = "Cost Summary2.xlsx : CheckSums"
-           UpperLeft  = match sheet.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> convertLabel
-           LowerRight = match sheet.LowerRight  with | Index(i,j) -> i,j | Label x -> x |> convertLabel
+           UpperLeft  = match sheet.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> CellIndex.ConvertLabel
+           LowerRight = match sheet.LowerRight  with | Index(i,j) -> i,j | Label x -> x |> CellIndex.ConvertLabel
            Values = sheet.Values }
     RangeWithCheckSumsCol (range')
     |> fun x -> printfn "%A %A %A" x.CheckSums x.CheckResults x.CheckErrors
@@ -96,8 +104,8 @@ do
     let sheet = Sheet (``Cost Summary2.xlsx``, "CheckSums2", false)
     let range' : Range = 
         {  Name = "Cost Summary2.xlsx : CheckSums2"
-           UpperLeft  = match sheet.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> convertLabel
-           LowerRight = match sheet.LowerRight  with | Index(i,j) -> i,j | Label x -> x |> convertLabel
+           UpperLeft  = match sheet.UpperLeft   with | Index(i,j) -> i,j | Label x -> x |> CellIndex.ConvertLabel
+           LowerRight = match sheet.LowerRight  with | Index(i,j) -> i,j | Label x -> x |> CellIndex.ConvertLabel
            Values = sheet.Values }
     let conversion (i: int) (j: int) x = 
         match x with

@@ -110,13 +110,9 @@
         new (fileName : string, sheetName: string, editable: bool) = 
             Sheet (new Pollux.Log.DefaultLogger(), fileName, sheetName , editable)
 
-        static member ConvertCellIndex = function
-            | Label label -> Index (CellIndex.ConvertLabel label)
-            | Index (x,y) -> Label (convertIndex x y)
+        static member ConvertCellIndex = convertCellIndex
 
-        static member ConvertCellIndex2 = function
-            | Label label -> CellIndex.ConvertLabel label
-            | Index (x,y) -> x,y
+        static member ConvertCellIndex2 = convertCellIndex2
 
         member x.Rows = rows
         member x.Cols = cols

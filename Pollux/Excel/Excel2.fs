@@ -2,6 +2,8 @@
 
     open Pollux.Excel.Utils
 
+
+
     type LargeSheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
         let sheetName = sheetName
         let logInfo format = log.LogLine Pollux.Log.LogLevel.Info format
@@ -10,7 +12,12 @@
         let cellFormula   = ref (Dict<int,string>())
         let extensionList = ref (Dict<int,string>())
 
-        let fCell i x = setCell i x log inlineString cellFormula extensionList 
+        let capacity1, capacity2 = 10000, 1000
+        let initValue = CellContent.Empty
+
+        let values = ref (Array2D.createBased<CellContent> 0 0 capacity1 capacity2 initValue)
+
+        let fCell i x = setCell2 i x log values inlineString cellFormula extensionList 
         
         let cells =
             let partUri = sprintf "/xl/worksheets/sheet%s.xml" (getSheetId log fileName sheetName)
@@ -83,10 +90,10 @@
                 |> not
             else false
 
-        let values =
+        let updateValues =
             logInfo "%s" "Building values ..."
-            let a,a' = Sheet.ConvertCellIndex2 lowerRight
-            let b,b' = Sheet.ConvertCellIndex2 upperLeft 
+            let a,a' = convertCellIndex2 lowerRight
+            let b,b' = convertCellIndex2 upperLeft 
             let evaluate i j =
                 let index = i+b, j+b'
                 if cells.ContainsKey(index) then
@@ -100,9 +107,9 @@
                         else CellContent.Decimal(x.CellValue)
                     else CellContent.Empty
                 else CellContent.Empty
-            array2D [| for i in [0 .. (a-b)] do 
-                            yield [ for j in [0 .. (a'-b')] do 
-                                       yield (evaluate i j) ] |]
+            for i in [0 .. (a-b)] do 
+                for j in [0 .. (a'-b')] do 
+                    (!values).[i,j] <- (evaluate i j)
 
         new (workbook : Workbook, sheetName: string, editable: bool) = 
             LargeSheet (new Pollux.Log.DefaultLogger(), workbook.FileFullName, sheetName , editable)
@@ -110,13 +117,9 @@
         new (fileName : string, sheetName: string, editable: bool) = 
             LargeSheet (new Pollux.Log.DefaultLogger(), fileName, sheetName , editable)
 
-        static member ConvertCellIndex = function
-            | Label label -> Index (CellIndex.ConvertLabel label)
-            | Index (x,y) -> Label (convertIndex x y)
+        static member ConvertCellIndex = convertCellIndex
 
-        static member ConvertCellIndex2 = function
-            | Label label -> CellIndex.ConvertLabel label
-            | Index (x,y) -> x,y
+        static member ConvertCellIndex2 = convertCellIndex2
 
         member x.Rows = rows
         member x.Cols = cols
@@ -124,7 +127,10 @@
         member x.UpperLeft = upperLeft
         member x.LowerRight = lowerRight
 
-        member x.Values : CellContent [,] = values
+        member x.Values : CellContent [,] = 
+            Array2D.initBased<CellContent> 0 0
+                ((fst (convertCellIndex2 lowerRight))+1) ((snd (convertCellIndex2 lowerRight))+1) 
+                (fun i j -> (!values).[i,j])
 
         member x.Ranges = ranges
         member x.Range (i : Index, j : Index) =
