@@ -1,5 +1,9 @@
 ﻿namespace Pollux.Excel
 
+#if INTERACTIVE
+    open Pollux.Log
+    open Pollux.Excel
+#endif
     open Pollux.Excel.Utils
 
     type Sheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =

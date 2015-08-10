@@ -2,6 +2,11 @@
 
 module Pollux.Excel.Utils
 
+#if INTERACTIVE    
+open Pollux.Log
+open Pollux.Excel
+#endif
+
 
 open FParsec
 

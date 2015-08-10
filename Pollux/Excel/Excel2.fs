@@ -1,7 +1,11 @@
 ﻿namespace Pollux.Excel
 
-    open Pollux.Excel.Utils
 
+#if INTERACTIVE
+    open Pollux.Log
+    open Pollux.Excel
+#endif
+    open Pollux.Excel.Utils
 
 
     type LargeSheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
@@ -92,8 +96,8 @@
 
         let updateValues =
             logInfo "%s" "Building values ..."
-            let a,a' = convertCellIndex2 lowerRight
-            let b,b' = convertCellIndex2 upperLeft 
+            let a,a' = LargeSheet.ConvertCellIndex2 lowerRight
+            let b,b' = LargeSheet.ConvertCellIndex2 upperLeft 
             let evaluate i j =
                 let index = i+b, j+b'
                 if cells.ContainsKey(index) then
@@ -129,7 +133,8 @@
 
         member x.Values : CellContent [,] = 
             Array2D.initBased<CellContent> 0 0
-                ((fst (convertCellIndex2 lowerRight))+1) ((snd (convertCellIndex2 lowerRight))+1) 
+                ((fst (convertCellIndex2 lowerRight)) - (fst (convertCellIndex2 upperLeft)) + 1) 
+                ((snd (convertCellIndex2 lowerRight)) - (snd (convertCellIndex2 upperLeft)) + 1) 
                 (fun i j -> (!values).[i,j])
 
         member x.Ranges = ranges

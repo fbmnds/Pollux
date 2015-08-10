@@ -17,6 +17,7 @@ fsi.AddPrinter(fun (x:XmlNode) -> x.OuterXml);;
 #load "Utils.fs"
 #load "Range.fs"
 #load "Excel.fs"
+#load "Excel2.fs"
 
 open Pollux.Excel
 open Pollux.Excel.Utils
