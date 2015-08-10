@@ -195,7 +195,7 @@ module Basics =
                Values = sheet3.Values }
         let conversion (i: int) (j: int) x = 
             match x with
-            | StringTableIndex _ | InlineString _ | Empty -> 0M
+            | StringTableIndex _ | InlineString _ | Pending | Empty -> 0M
             | Decimal x -> x
             | Date x -> decimal (toJulianDate x)
         RangeWithCheckSumsCol (range', conversion)

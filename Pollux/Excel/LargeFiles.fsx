@@ -1,40 +1,71 @@
-﻿
-#r "WindowsBase.dll"
+﻿#r "WindowsBase.dll"
 #r "DocumentFormat.OpenXML.dll"
 #r @"..\..\Pollux\packages\FParsec.1.0.1\lib\net40-client\FParsecCS.dll"
 #r @"..\..\Pollux\packages\FParsec.1.0.1\lib\net40-client\FParsec.dll"
 
+open FParsec
 #r "System.Xml.Linq.dll"
-
-
 open System.Xml
-open System.Xml.Linq
-open System.Xml.XPath
 
 open System.IO.Packaging
-
-open FParsec
-open FParsec.CharParsers
-open FParsec.Primitives
 
 #time;;
 fsi.AddPrinter(fun (x:XmlNode) -> x.OuterXml);;
 
 #load "Log.fs"
+#load "Types.fs"
 #load "Utils.fs"
+#load "Range.fs"
 #load "Excel.fs"
+#load "Excel2.fs"
 
 open Pollux.Log
 open Pollux.Excel
 open Pollux.Excel.Utils
+open Pollux.Excel.Range
 
-let log = (new Pollux.Log.ConsoleLogger()) :> Pollux.Log.ILogger
+let log = (new ConsoleLogger() :> ILogger)
+log
 
 let ``file6000rows.xlsx`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows.xlsx"
 
 let ``Übersicht`` = 
     __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2\xl\worksheets\sheet1.xml"
     |> fun x -> System.IO.File.ReadAllText(x)
+
+let ``Cost Summary2.xlsx``  = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2.xlsx"
+let ``Cost Summary2_1.txt`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2_1.txt"
+let ``Cost Summary2_2.txt`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2_2.txt"
+let ``Cost Summary2_3.txt`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2_3.txt"
+
+let sheet = LargeSheet (``Cost Summary2.xlsx``, "Übersicht", false)
+let sheet2 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums", false)
+let sheet3 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums2", false)
+
+
+
+do
+    let range' : Range = 
+        {  Name = "Cost Summary2.xlsx : CheckSums"
+           UpperLeft  = sheet2.UpperLeft.ToTuple
+           LowerRight = sheet2.LowerRight.ToTuple
+           Values = sheet2.Values }
+    Pollux.Excel.Range.RangeWithCheckSumsRow (range')
+    |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
+    |> printfn "%A"
+    
+
+do
+    let sheet = Sheet (``Cost Summary2.xlsx``, "Übersicht", false)
+    printfn "%A" sheet.UpperLeft
+    printfn "%A" sheet.LowerRight
+    //sheet.Cells() |> Map.iter (fun k v -> printfn "%s:\n %A" k v)
+    //sheet.CellFormats |> Map.iter (fun k v -> printfn "%d:\n %A" k v)
+    printfn "--------"
+    sheet.Values
+    |> Array2D.iteri (fun i j x -> 
+        if x <> CellContent.Empty then 
+            printfn "%s %A" (convertIndex i j) x)
 
 
 let ``Ref Übersicht`` =

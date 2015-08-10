@@ -106,7 +106,8 @@
     | InlineString      of int
     | Decimal           of decimal
     | Date              of System.DateTime
-    | Empty          
+    | Pending    
+    | Empty      
     
     [<CustomEquality; NoComparison; CLIMutable>]
     type Cell = 

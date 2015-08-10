@@ -2,6 +2,11 @@
 
 module Pollux.Excel.Utils
 
+#if INTERACTIVE    
+open Pollux.Log
+open Pollux.Excel
+#endif
+
 
 open FParsec
 
@@ -20,6 +25,13 @@ let inline (|IsNull|) x = isNull x
 let inline convertIndex x y = sprintf "%s%d" (CellIndex.ColumnLabel y) (x + 1)
 let inline convertIndex2 (x : int*int) = convertIndex (fst x) (snd x)
 
+let convertCellIndex = function
+    | Label label -> Index (CellIndex.ConvertLabel label)
+    | Index (x,y) -> Label (convertIndex x y)
+
+let convertCellIndex2 = function
+    | Label label -> CellIndex.ConvertLabel label
+    | Index (x,y) -> x,y
 
 let rec isDateTime (s : string) =
     run (anyOf "ymdhs:") s
@@ -171,6 +183,42 @@ let getSheetId (log : Pollux.Log.ILogger) (fileName : string) (sheetName : strin
 
 
 let setCell i x (log : #Pollux.Log.ILogger)
+    (inlineString: Dict<int,string> ref) (cellFormula: Dict<int,string> ref ) (extensionList: Dict<int,string> ref) = 
+    let info = Pollux.Log.LogLevel.Info
+    let test name = 
+        let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
+        if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
+    let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
+    let xa s = test' ((xd x).Root.Attribute(xn s))
+    let test2 x (y: Dict<int,string>)  = 
+        let z = test x
+        if z = "" then -1 
+        else y.Add (i, z); i
+    let test3 (x: string) = if (xa x) = "" then -1 else x |> xa |> int
+    let cv, cvb =     
+        if "" = test "v" then -1M,false
+        else
+            try (test "v" |> decimal),true
+            with | _ -> 
+                log.LogLine info "setCell: ignoring invalid cell '%s'" x
+                -1M,false
+    let rR = xa "r"  |> CellIndex.ConvertLabel |> fst
+    let rC = xa "r"  |> CellIndex.ConvertLabel |> snd
+    ((rR,rC),
+        {   isCellValueValid   = cvb
+            CellValue          = cv
+            InlineString       = test2 "is" !inlineString
+            CellFormula        = test2 "f" !cellFormula
+            ExtensionList      = test2 "extLst" !extensionList
+            CellMetadataIndex  = test3 "cm"
+            ShowPhonetic       = test3 "ph" 
+            ReferenceRow       = rR
+            ReferenceCol       = rC
+            StyleIndex         = test3 "s"  
+            CellDataType       = if (xa "t") = "" then ' ' else ((xa "t").ToCharArray()).[0]
+            ValueMetadataIndex = test3 "vm" })
+
+let setCell2 i x (log : #Pollux.Log.ILogger) (values: CellContent [,] ref)
     (inlineString: Dict<int,string> ref) (cellFormula: Dict<int,string> ref ) (extensionList: Dict<int,string> ref) = 
     let info = Pollux.Log.LogLevel.Info
     let test name = 
