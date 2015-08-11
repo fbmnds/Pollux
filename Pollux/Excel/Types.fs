@@ -108,6 +108,7 @@
     | Date              of System.DateTime
     | Pending    
     | Empty      
+
     
     [<CustomEquality; NoComparison; CLIMutable>]
     type Cell = 
@@ -116,6 +117,7 @@
           InlineString       : int
           CellFormula        : int
           ExtensionList      : int
+          UnknownCellFormat  : int
           CellMetadataIndex  : int
           ShowPhonetic       : int
           ReferenceRow       : int

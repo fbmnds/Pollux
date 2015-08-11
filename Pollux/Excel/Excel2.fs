@@ -10,18 +10,25 @@
 
     type LargeSheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
         let sheetName = sheetName
-        let logInfo format = log.LogLine Pollux.Log.LogLevel.Info format
-        let logError format = log.LogLine Pollux.Log.LogLevel.Error format
-        let inlineString  = ref (Dict<int,string>())
-        let cellFormula   = ref (Dict<int,string>())
-        let extensionList = ref (Dict<int,string>())
-
+        let logInfo format  = log.LogLine Pollux.Log.LogLevel.Info format
+        let cellContentContext =
+            { log = log
+              inlineString      = ref (Dict<int,string>())
+              cellFormula       = ref (Dict<int,string>())
+              extensionList     = ref (Dict<int,string>())
+              unknownCellFormat = ref (Dict<int,string>()) }
+        
+        // fetch sheet as char array
+        // read dimensions
         let capacity1, capacity2 = 10000, 1000
         let initValue = CellContent.Empty
+        
+        // build values array2D
+        //
 
         let values = ref (Array2D.createBased<CellContent> 0 0 capacity1 capacity2 initValue)
 
-        let fCell i x = setCell2 i x log values inlineString cellFormula extensionList 
+        let fCell index outerXml = setCell3 cellContentContext index outerXml
         
         let cells =
             let partUri = sprintf "/xl/worksheets/sheet%s.xml" (getSheetId log fileName sheetName)

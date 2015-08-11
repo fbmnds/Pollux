@@ -145,6 +145,7 @@ let inline getPart2 (log : Pollux.Log.ILogger)
 let xn s = System.Xml.Linq.XName.Get(s)
 let xd s = System.Xml.Linq.XDocument.Parse(s)
 
+
 let getSheetId (log : Pollux.Log.ILogger) (fileName : string) (sheetName : string) =
     let partUri = "/xl/workbook.xml"
     let xPath = (sprintf "//*[name()='sheet' and @name='%s']" sheetName)
@@ -153,6 +154,12 @@ let getSheetId (log : Pollux.Log.ILogger) (fileName : string) (sheetName : strin
     |> fun x -> 
         (xd x).Root.Attribute(xn "sheetId").Value
 
+type CellContentContext =
+    { log               : Pollux.Log.ILogger 
+      inlineString      : Dict<int,string> ref
+      cellFormula       : Dict<int,string> ref
+      extensionList     : Dict<int,string> ref
+      unknownCellFormat : Dict<int,string> ref }
 
 let setCell i x (log : #Pollux.Log.ILogger)
     (inlineString: Dict<int,string> ref) (cellFormula: Dict<int,string> ref ) (extensionList: Dict<int,string> ref) = 
@@ -182,6 +189,7 @@ let setCell i x (log : #Pollux.Log.ILogger)
             InlineString       = test2 "is" !inlineString
             CellFormula        = test2 "f" !cellFormula
             ExtensionList      = test2 "extLst" !extensionList
+            UnknownCellFormat  = -1
             CellMetadataIndex  = test3 "cm"
             ShowPhonetic       = test3 "ph" 
             ReferenceRow       = rR
@@ -218,6 +226,7 @@ let setCell2 i x (log : #Pollux.Log.ILogger) (values: CellContent [,] ref)
             InlineString       = test2 "is" !inlineString
             CellFormula        = test2 "f" !cellFormula
             ExtensionList      = test2 "extLst" !extensionList
+            UnknownCellFormat  = -1
             CellMetadataIndex  = test3 "cm"
             ShowPhonetic       = test3 "ph" 
             ReferenceRow       = rR
@@ -226,34 +235,34 @@ let setCell2 i x (log : #Pollux.Log.ILogger) (values: CellContent [,] ref)
             CellDataType       = if (xa "t") = "" then ' ' else ((xa "t").ToCharArray()).[0]
             ValueMetadataIndex = test3 "vm" })
 
-let setCell3 i x (log : #Pollux.Log.ILogger) (source: char [] ref) (values: CellContent [,] ref)
-    (inlineString: Dict<int,string> ref) (cellFormula: Dict<int,string> ref ) (extensionList: Dict<int,string> ref) = 
-    let info = Pollux.Log.LogLevel.Info
+let setCell3 (ctx : CellContentContext) index outerXml = 
+    let logInfo format = ctx.log.LogLine Pollux.Log.Info format
     let test name = 
-        let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
+        let x' = (xd outerXml).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
         if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
     let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
-    let xa s = test' ((xd x).Root.Attribute(xn s))
+    let xa s = test' ((xd outerXml).Root.Attribute(xn s))
     let test2 x (y: Dict<int,string>)  = 
         let z = test x
         if z = "" then -1 
-        else y.Add (i, z); i
+        else y.Add (index, z); index
     let test3 (x: string) = if (xa x) = "" then -1 else x |> xa |> int
     let cv, cvb =     
         if "" = test "v" then -1M,false
         else
             try (test "v" |> decimal),true
             with | _ -> 
-                log.LogLine info "setCell: ignoring invalid cell '%s'" x
+                logInfo "setCell: ignoring invalid cell '%s'" outerXml
                 -1M,false
     let rR = xa "r"  |> CellIndex.ConvertLabel |> fst
     let rC = xa "r"  |> CellIndex.ConvertLabel |> snd
     ((rR,rC),
         {   isCellValueValid   = cvb
             CellValue          = cv
-            InlineString       = test2 "is" !inlineString
-            CellFormula        = test2 "f" !cellFormula
-            ExtensionList      = test2 "extLst" !extensionList
+            InlineString       = test2 "is" !(ctx.inlineString)
+            CellFormula        = test2 "f" !(ctx.cellFormula)
+            ExtensionList      = test2 "extLst" !(ctx.extensionList)
+            UnknownCellFormat  = -1
             CellMetadataIndex  = test3 "cm"
             ShowPhonetic       = test3 "ph" 
             ReferenceRow       = rR

@@ -59,8 +59,8 @@ module Cell =
                     Open2 { cursor = x.cursor + 1; pos1 = x.pos1; acc = x.acc; refS = x.refS }
             | EOF acc -> printfn "EOF"; EOF acc
 
-        let parse (xml: char [] ref) =
-            let acc = ref (System.Collections.Generic.List<int*int>(10000000))
+        let parse (capacity: int) (xml: char [] ref) =
+            let acc = ref (System.Collections.Generic.List<int*int>(capacity))
             let rec loop state =
                 match state with
                 | EOF acc -> acc
