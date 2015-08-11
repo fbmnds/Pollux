@@ -6,7 +6,7 @@
     open Pollux.Excel
 #endif
     open Pollux.Excel.Utils
-
+    open System.IO.Packaging
 
     type LargeSheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
         let sheetName = sheetName
@@ -19,13 +19,23 @@
               unknownCellFormat = ref (Dict<int,string>()) }
         
         // fetch sheet as char array
-        // read dimensions
+        let sheetAsString =
+            let partUri =  sprintf "/xl/worksheets/sheet%s.xml" (getSheetId log fileName sheetName)
+            use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
+            let part = 
+                xlsx.GetParts()
+                |> Seq.filter (fun x -> x.Uri.ToString() = partUri)
+                |> Seq.head
+            use stream = part.GetStream(System.IO.FileMode.Open, System.IO.FileAccess.Read)        
+            use reader = new System.IO.StreamReader(stream,System.Text.Encoding.UTF8)
+            reader.ReadToEnd()
+            
+        // read dimensions, 425 chars
+        // -> upperLeft, lowerRight
+
+        // build values array2D
         let capacity1, capacity2 = 10000, 1000
         let initValue = CellContent.Empty
-        
-        // build values array2D
-        //
-
         let values = ref (Array2D.createBased<CellContent> 0 0 capacity1 capacity2 initValue)
 
         let fCell index outerXml = setCell3 cellContentContext index outerXml

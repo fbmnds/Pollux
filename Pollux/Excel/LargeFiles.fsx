@@ -36,6 +36,11 @@ let ``Übersicht`` =
     __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2\xl\worksheets\sheet1.xml"
     |> fun x -> System.IO.File.ReadAllText(x)
 
+let ``Random`` =
+    __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows\xl\worksheets\sheet1.xml"
+    |> fun x -> System.IO.File.ReadAllText(x)
+
+
 let ``Cost Summary2.xlsx``  = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2.xlsx"
 let ``Cost Summary2_1.txt`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2_1.txt"
 let ``Cost Summary2_2.txt`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2_2.txt"
@@ -46,22 +51,12 @@ let sheet2 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums", false)
 let sheet3 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums2", false)
 
 
-let ``Ref Übersicht`` =
-    __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2\xl\worksheets\sheet1.xml"
-    |> fun x -> System.IO.File.ReadAllText(x)
-    |> fun x -> ref (x.ToCharArray())
-
-let ``Ref Random`` =
-    __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows\xl\worksheets\sheet1.xml"
-    |> fun x -> System.IO.File.ReadAllText(x)
-    |> fun x -> ref (x.ToCharArray())
-
 do
-    parse 1000 ``Ref Übersicht``
+    parse 1000 (ref ``Übersicht``)
     |> Seq.iter (printfn "%s")
 
 do
-    parse 10000000 ``Ref Random``
+    parse 10000000 (ref ``Random``)
     |> Seq.take 5
     |> Seq.iter (printfn "%s")
 
@@ -70,9 +65,8 @@ do
 //    <c r="C1" s="2"><f t="shared" ca="1" si="0"/>
 //    <c r="D1" s="2"><f t="shared" ca="1" si="0"/>
 //    <c r="E1" s="2"><f t="shared" ca="1" si="0"/>
-//    Real: 00:10:38.708, CPU: 00:10:23.234, GC gen0: 152262, gen1: 8093, gen2: 7
+//    Real: 00:05:37.556, CPU: 00:05:36.406, GC gen0: 70187, gen1: 7810, gen2: 3
 //    val it : unit = ()
-//    > 
 
 
 do 

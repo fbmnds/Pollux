@@ -14,19 +14,18 @@ module Cell =
             { cursor : int
               pos1   : int
               acc    : System.Collections.Generic.List<int*int> ref
-              refS   : char [] ref }
+              refS   : string ref }
 
 
         let work state =     
-            let isEOF (rs: char [] ref) pos = (pos >= (!rs).Length)
-            let testChars (rs: char [] ref) (cs: char []) pos =
+            let isEOF (rs: string ref) pos = (pos >= (!rs).Length)
+            let testChars (rs: string ref) (cs: string) pos =                 
                 if pos + cs.Length |> isEOF rs then false 
-                else
-                    cs |> Array.mapi (fun i x -> x = (!rs).[pos+i]) |> Array.filter id |> fun x -> x.Length = cs.Length
-            let isOpen1 (rs: char [] ref) pos = testChars rs [|'<';'c';' '|] pos
-            let isOpen2 (rs: char [] ref) pos = testChars rs [|'<';'c';'>'|] pos
-            let isClose1 (rs: char [] ref) pos = testChars rs [|'/';'>'|] pos
-            let isClose2 (rs: char [] ref) pos = testChars rs [|'<';'/';'c';'>'|] pos
+                else(!rs).Substring(pos, cs.Length) = cs
+            let isOpen1 (rs: string ref) pos = testChars rs "<c " pos
+            let isOpen2 (rs: string ref) pos = testChars rs "<c>" pos
+            let isClose1 (rs: string ref) pos = testChars rs "/>" pos
+            let isClose2 (rs: string ref) pos = testChars rs "</c>" pos
             state
             |> function
             | Search x -> 
@@ -59,7 +58,7 @@ module Cell =
                     Open2 { cursor = x.cursor + 1; pos1 = x.pos1; acc = x.acc; refS = x.refS }
             | EOF acc -> printfn "EOF"; EOF acc
 
-        let parse (capacity: int) (xml: char [] ref) =
+        let parse (capacity: int) (xml: string ref) =
             let acc = ref (System.Collections.Generic.List<int*int>(capacity))
             let rec loop state =
                 match state with
