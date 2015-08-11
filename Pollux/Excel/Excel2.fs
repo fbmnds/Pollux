@@ -11,14 +11,7 @@
     type LargeSheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
         let sheetName = sheetName
         let logInfo format  = log.LogLine Pollux.Log.LogLevel.Info format
-        let cellContentContext =
-            { log = log
-              inlineString      = ref (Dict<int,string>())
-              cellFormula       = ref (Dict<int,string>())
-              extensionList     = ref (Dict<int,string>())
-              unknownCellFormat = ref (Dict<int,string>()) }
         
-        // fetch sheet as char array
         let sheetAsString =
             let partUri =  sprintf "/xl/worksheets/sheet%s.xml" (getSheetId log fileName sheetName)
             use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
@@ -29,6 +22,13 @@
             use stream = part.GetStream(System.IO.FileMode.Open, System.IO.FileAccess.Read)        
             use reader = new System.IO.StreamReader(stream,System.Text.Encoding.UTF8)
             reader.ReadToEnd()
+
+        let cellContentContext =
+            { log = log
+              inlineString      = ref (Dict<int,string>())
+              cellFormula       = ref (Dict<int,string>())
+              extensionList     = ref (Dict<int,string>())
+              unknownCellFormat = ref (Dict<int,string>()) }
             
         // read dimensions, 425 chars
         // -> upperLeft, lowerRight

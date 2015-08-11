@@ -52,11 +52,11 @@ let sheet3 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums2", false)
 
 
 do
-    parse 1000 (ref ``Übersicht``)
+    parse 1000 "c" (ref ``Übersicht``)
     |> Seq.iter (printfn "%s")
 
 do
-    parse 10000000 (ref ``Random``)
+    parse 10000000 "c" (ref ``Random``)
     |> Seq.take 5
     |> Seq.iter (printfn "%s")
 
@@ -65,7 +65,7 @@ do
 //    <c r="C1" s="2"><f t="shared" ca="1" si="0"/>
 //    <c r="D1" s="2"><f t="shared" ca="1" si="0"/>
 //    <c r="E1" s="2"><f t="shared" ca="1" si="0"/>
-//    Real: 00:05:37.556, CPU: 00:05:36.406, GC gen0: 70187, gen1: 7810, gen2: 3
+//    Real: 00:06:13.092, CPU: 00:06:07.578, GC gen0: 72786, gen1: 8089, gen2: 3
 //    val it : unit = ()
 
 
