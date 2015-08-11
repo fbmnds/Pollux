@@ -54,6 +54,7 @@
     <Compile Include="Utils.fs" />
     <Compile Include="Range.fs" />
     <Compile Include="Excel.fs" />
+    <Compile Include="CellParser.fs" />
     <Compile Include="Excel2.fs" />
     <None Include="Range.fsx" />
     <None Include="Xml.IO.fsx" />

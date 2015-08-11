@@ -17,21 +17,29 @@ fsi.AddPrinter(fun (x:XmlNode) -> x.OuterXml);;
 #load "Utils.fs"
 #load "Range.fs"
 #load "Excel.fs"
+#load "CellParser.fs"
 #load "Excel2.fs"
+
 
 open Pollux.Log
 open Pollux.Excel
 open Pollux.Excel.Utils
 open Pollux.Excel.Range
+open Pollux.Excel.Cell.Parser
 
 let log = (new ConsoleLogger() :> ILogger)
-log
+
 
 let ``file6000rows.xlsx`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows.xlsx"
 
 let ``Übersicht`` = 
     __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2\xl\worksheets\sheet1.xml"
     |> fun x -> System.IO.File.ReadAllText(x)
+
+let ``Random`` =
+    __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows\xl\worksheets\sheet1.xml"
+    |> fun x -> System.IO.File.ReadAllText(x)
+
 
 let ``Cost Summary2.xlsx``  = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2.xlsx"
 let ``Cost Summary2_1.txt`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2_1.txt"
@@ -43,117 +51,66 @@ let sheet2 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums", false)
 let sheet3 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums2", false)
 
 
+do
+    parseCell 1000 (ref ``Übersicht``)
+    |> Seq.iter (printfn "%s")
 
 do
-    let range' : Range = 
-        {  Name = "Cost Summary2.xlsx : CheckSums"
-           UpperLeft  = sheet2.UpperLeft.ToTuple
-           LowerRight = sheet2.LowerRight.ToTuple
-           Values = sheet2.Values }
-    Pollux.Excel.Range.RangeWithCheckSumsRow (range')
-    |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
-    |> printfn "%A"
-    
+    parseCell 10000000 (ref ``Random``)
+    |> Seq.take 5
+    |> Seq.iter (printfn "%s")
 
-do
-    let sheet = Sheet (``Cost Summary2.xlsx``, "Übersicht", false)
-    printfn "%A" sheet.UpperLeft
-    printfn "%A" sheet.LowerRight
-    //sheet.Cells() |> Map.iter (fun k v -> printfn "%s:\n %A" k v)
-    //sheet.CellFormats |> Map.iter (fun k v -> printfn "%d:\n %A" k v)
-    printfn "--------"
-    sheet.Values
-    |> Array2D.iteri (fun i j x -> 
-        if x <> CellContent.Empty then 
-            printfn "%s %A" (convertIndex i j) x)
-
-
-let ``Ref Übersicht`` =
-    __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2\xl\worksheets\sheet1.xml"
-    |> fun x -> System.IO.File.ReadAllText(x)
-    |> fun x -> ref (x.ToCharArray())
-
-let ``Ref Random`` =
-    __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows\xl\worksheets\sheet1.xml"
-    |> fun x -> System.IO.File.ReadAllText(x)
-    |> fun x -> ref (x.ToCharArray())
-
-
-type State = 
-| Search       of Result
-| Open1        of Result
-| Open2        of Result
-| EOF          of System.Collections.Generic.List<int*int> ref
-and Result =
-    { cursor : int
-      pos1   : int
-      acc    : System.Collections.Generic.List<int*int> ref
-      refS   : char [] ref }
-
-
-let work state =     
-    let isEOF (rs: char [] ref) pos = (pos >= (!rs).Length)
-    let testChars (rs: char [] ref) (cs: char []) pos =
-        if pos + cs.Length |> isEOF rs then false 
-        else
-            cs |> Array.mapi (fun i x -> x = (!rs).[pos+i]) |> Array.filter id |> fun x -> x.Length = cs.Length
-    let isOpen1 (rs: char [] ref) pos = testChars rs [|'<';'c';' '|] pos
-    let isOpen2 (rs: char [] ref) pos = testChars rs [|'<';'c';'>'|] pos
-    let isClose1 (rs: char [] ref) pos = testChars rs [|'/';'>'|] pos
-    let isClose2 (rs: char [] ref) pos = testChars rs [|'<';'/';'c';'>'|] pos
-    state
-    |> function
-    | Search x -> 
-        if x.cursor |> isEOF x.refS then EOF x.acc
-        else if x.cursor |> isOpen1 x.refS then 
-            Open1 { cursor = x.cursor + "<c ".Length; pos1 = x.pos1; acc = x.acc; refS = x.refS }
-        else if x.cursor |> isOpen2 x.refS then 
-            Open2 { cursor = x.cursor + "<c>".Length; pos1 = x.pos1; acc = x.acc; refS = x.refS }
-        else 
-            Search { cursor = x.cursor + 1; pos1 = x.pos1 + 1; acc = x.acc; refS = x.refS }
-    | Open1 x -> 
-        if x.cursor |> isEOF x.refS then EOF x.acc
-        else if x.cursor |> isClose1 x.refS then 
-            let cursor' = x.cursor + "/>".Length         
-            (!x.acc).Add(x.pos1,cursor')    
-            Search { cursor = cursor' ; pos1 = cursor'; acc = x.acc; refS = x.refS }
-        else if x.cursor |> isClose2 x.refS then 
-            let cursor' = x.cursor + "</c>".Length
-            (!x.acc).Add(x.pos1,cursor')
-            Search { cursor = cursor' ; pos1 = cursor'; acc = x.acc; refS = x.refS }
-        else
-            Open1 { cursor = x.cursor + 1; pos1 = x.pos1; acc = x.acc; refS = x.refS }
-    | Open2 x ->
-        if x.cursor |> isEOF x.refS then EOF x.acc
-        else if x.cursor |> isClose2 x.refS then 
-            let cursor' = x.cursor + "</c>".Length
-            (!x.acc).Add(x.pos1,cursor')
-            Search { cursor = cursor' ; pos1 = cursor'; acc = x.acc  ; refS = x.refS }
-        else
-            Open2 { cursor = x.cursor + 1; pos1 = x.pos1; acc = x.acc; refS = x.refS }
-    | EOF acc -> printfn "EOF"; EOF acc
-
-let parse (xml: char [] ref) =
-    let acc = ref (System.Collections.Generic.List<int*int>(10000000))
-    let rec loop state =
-        match state with
-        | EOF acc -> acc
-        | _ -> loop (work state)
-    loop (Search { cursor = 0; pos1 = 0; acc = acc; refS = xml })
-
-do
-    parse ``Ref Übersicht``
-    |> printfn "%A"
-
-do
-    parse ``Ref Random``
-    |> printfn "%A"
-
-//    {contents = seq [(859, 922); (922, 1016); (1016, 1061); (1075, 1120); ...];}
-//    Real: 00:09:45.977, CPU: 00:09:40.953, GC gen0: 152261, gen1: 8091, gen2: 6
+//    <c r="A1" s="2"><f ca="1">RANDBETWEEN(0,1000)</f><v>437</v></c>
+//    <c r="B1" s="2"><f t="shared" ref="B1:BM2" ca="1" si="0">RANDBETWEEN(0,1000)</f><v>358</v></c>
+//    <c r="C1" s="2"><f t="shared" ca="1" si="0"/>
+//    <c r="D1" s="2"><f t="shared" ca="1" si="0"/>
+//    <c r="E1" s="2"><f t="shared" ca="1" si="0"/>
+//    Real: 00:06:13.092, CPU: 00:06:07.578, GC gen0: 72786, gen1: 8089, gen2: 3
 //    val it : unit = ()
-//    > 
 
+
+do
+    let s = 
+        """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x14ac" xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"><dimension ref="A1:H33"/><sheetViews><sheetView showGridLines
+        """ 
+        |> fun x -> x.Substring(0,425)
+        |> ref
+    s
+    |> (Pollux.Excel.Cell.Parser.parse 1 "dimension")
+    |> Seq.head
+    |> fun x -> 
+        let len = x.Length 
+        (x.Substring(0, len - "\"/>".Length)).Substring("<dimension ref=\"".Length).Split([|':'|])
+    |> fun x -> CellIndex.ConvertLabel x.[0], CellIndex.ConvertLabel x.[1]
+    |> printfn "%A"
+
+do
+    let inline isNull x = x = Unchecked.defaultof<_>
+    let xn s = System.Xml.Linq.XName.Get(s)
+    let xd s = System.Xml.Linq.XDocument.Parse(s)
+    let outerXml = """<c r="B1" s="2"><f t="shared" ref="B1:BM2" ca="1" si="0">RANDBETWEEN(0,1000)</f><v>358</v></c>"""
+    let test name = 
+        let x' = (xd outerXml).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
+        if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
+    let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
+    let xa s = test' ((xd outerXml).Root.Attribute(xn s))
+//    let test2 x (y: Dict<int,string>)  = 
+//        let z = test x
+//        if z = "" then -1 
+//        else y.Add (index, z); index
+//    let test3 (x: string) = if (xa x) = "" then -1 else x |> xa |> int
+    let cv, cvb =     
+        if "" = test "v" then -1M,false
+        else
+            try (test "v" |> decimal),true
+            with | _ -> 
+                //logInfo "setCell: ignoring invalid cell '%s'" outerXml
+                -1M,false
+    let rR = xa "r"  |> CellIndex.ConvertLabel |> fst
+    let rC = xa "r"  |> CellIndex.ConvertLabel |> snd
+    printfn "cv '%f' cvb '%b' rR '%d' rC '%d'" cv cvb rR rC
 
 do 
     let findTag (tag: string) (s: string) = s.IndexOf(tag) |> fun x -> if x > -1 then s.Substring(x) else ""
