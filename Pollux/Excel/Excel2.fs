@@ -6,13 +6,16 @@
     open Pollux.Excel
 #endif
     open Pollux.Excel.Utils
+    open Pollux.Excel.Cell.Parser
     open System.IO.Packaging
 
     type LargeSheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
         let sheetName = sheetName
         let logInfo format  = log.LogLine Pollux.Log.LogLevel.Info format
+        let logError format  = log.LogLine Pollux.Log.LogLevel.Error format
         
-        let sheetAsString =
+        let sheetString =
+            logInfo "%s" "Reading worksheet ..."
             let partUri =  sprintf "/xl/worksheets/sheet%s.xml" (getSheetId log fileName sheetName)
             use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
             let part = 
@@ -21,51 +24,40 @@
                 |> Seq.head
             use stream = part.GetStream(System.IO.FileMode.Open, System.IO.FileAccess.Read)        
             use reader = new System.IO.StreamReader(stream,System.Text.Encoding.UTF8)
-            reader.ReadToEnd()
+            let s = reader.ReadToEnd()
+            logInfo "%s" "... reading worksheet done."
+            s
 
-        let cellContentContext =
-            { log = log
-              inlineString      = ref (Dict<int,string>())
-              cellFormula       = ref (Dict<int,string>())
-              extensionList     = ref (Dict<int,string>())
-              unknownCellFormat = ref (Dict<int,string>()) }
-            
-        // read dimensions, 425 chars
-        // -> upperLeft, lowerRight
+        let upperLeft, lowerRight, rowCapacity, colCapacity = 
+            try
+                logInfo "%s" "Reading sheet dimension ..."
+                let s = ref (sheetString.Substring(0,425))
+                parseUnsafe 1 "dimension" s
+                |> Seq.head
+                |> fun x -> 
+                    let len = x.Length 
+                    (x.Substring(0, len - "\"/>".Length)).Substring("<dimension ref=\"".Length).Split([|':'|])
+                |> fun x -> 
+                    let upperLeft = Index(CellIndex.ConvertLabel x.[0])
+                    let lowerRight = Index(CellIndex.ConvertLabel x.[1])
+                    let rowCapacity = (fst (convertCellIndex2 lowerRight)) - (fst (convertCellIndex2 upperLeft)) + 1
+                    let colCapacity = (snd (convertCellIndex2 lowerRight)) - (snd (convertCellIndex2 upperLeft)) + 1
+                    logInfo "%s" "... reading sheet dimension done."
+                    upperLeft, lowerRight, rowCapacity, colCapacity
+            with _ -> 
+                let msg = sprintf "LargeSheet: could not read 'dimension' of sheet '%s' in '%s'" sheetName fileName
+                logError "%s" msg
+                failwith msg
 
-        // build values array2D
-        let capacity1, capacity2 = 10000, 1000
-        let initValue = CellContent.Empty
-        let values = ref (Array2D.createBased<CellContent> 0 0 capacity1 capacity2 initValue)
-
-        let fCell index outerXml = setCell3 cellContentContext index outerXml
-        
-        let cells =
-            let partUri = sprintf "/xl/worksheets/sheet%s.xml" (getSheetId log fileName sheetName)
-            let xPath = "//*[name()='c']"
-            logInfo "Reading cells from %s, sheet %s in part %s:" fileName sheetName partUri
-            getPart1' log fileName xPath partUri fCell
-            |> dict
-
-        //let sharedStringTable = workbookPart.SharedStringTablePart.SharedStringTable
-        //let sharedStringItems = sharedStringTable.Elements<SharedStringItem'>()
-        let mutable ranges : Range list = []
-        
-        let rows = []
-        let cols = []
-
-        let upperLeft, lowerRight, keys =
-            logInfo "%s" "Beginning with upperLeft, lowerRight, keys ..." 
-            let keys = cells.Keys
-            let minX,maxX,minY,maxY =
-                keys 
-                |> Seq.fold (fun (minX,maxX,minY,maxY) (x,y) -> 
-                    min x minX, max x maxX, min y minY, max y maxY) 
-                    (System.Int32.MaxValue,System.Int32.MinValue,System.Int32.MaxValue,System.Int32.MinValue)
-            Index(minX, minY), Index(maxX,maxY), keys |> Seq.map (fun x -> Index(x))
+        let values = 
+            Array2D.createBased<CellContent> 0 0 rowCapacity colCapacity CellContent.Empty            
+        let inlineString      = Dict<int,string>()
+        let cellFormula       = Dict<int,string>()
+        let extensionList     = Dict<int,string>()
+        let unknownCellFormat = Dict<int,string>()
 
         let numberFormats, cellFormats = 
-            logInfo "%s" "upperLeft, lowerRight, keys finished,  beginning with numberFormats ..."
+            logInfo "%s" "Reading 'numberFormats' ..."
             let partUri = "/xl/styles.xml"
             let numberFormats = 
                 let xPath = "//*[name()='numFmt']"
@@ -75,7 +67,8 @@
                         if (isNull x || isNull x.Value) then "" else x.Value
                     let xa s = test' ((xd x).Root.Attribute(xn s))
                     { NumberFormatId = xa "numFmtId"; FormatCode = xa "formatCode" })
-            logInfo "%s" "numberFormats finished,  beginning with cellFormats ..."
+            logInfo "%s" "... reading 'numberFormats' done."
+            logInfo "%s" "Reading 'cellFormats' ..."
             let cellFormats = 
                 let xPath = "//*[name()='cellXfs']/*[name()='xf']"
                 getPart2 log fileName xPath partUri id2
@@ -94,43 +87,50 @@
                       XfId              = xa "xfId";
                       ApplyNumberFormat = xa "applyNumberFormat" })                             
                 |> Map.ofSeq
+            logInfo "%s" "... reading 'cellFormats' done."
             numberFormats, cellFormats
 
         let mutable cellDateTimeFormats = 
-            logInfo "%s" "cellFormats finished,  beginning with cellDateTimeFormats ..."
+            logInfo "%s" "Building 'cellDateTimeFormats'."
             numberFormats   
             |> Seq.filter (fun x -> x.FormatCode |> isDateTime)
             |> Seq.map (fun x -> x.NumberFormatId)
             |> Seq.append builtInDateTimeNumberFormatIDs 
         
-        let isCellDateTimeFormat x =
-            if cellFormats.ContainsKey (x) then 
-                cellDateTimeFormats
-                |> Seq.filter (fun x' -> x' = (cellFormats.[x]).NumFmtId)
-                |> Seq.isEmpty
-                |> not
-            else false
+        let isCellDateTimeFormat (cellFormats: Map<int,CellFormat>) =
+            (fun x ->
+                if cellFormats.ContainsKey (x) then 
+                    cellDateTimeFormats
+                    |> Seq.filter (fun x' -> x' = (cellFormats.[x]).NumFmtId)
+                    |> Seq.isEmpty
+                    |> not
+                else false)
 
-        let updateValues =
-            logInfo "%s" "Building values ..."
-            let a,a' = LargeSheet.ConvertCellIndex2 lowerRight
-            let b,b' = LargeSheet.ConvertCellIndex2 upperLeft 
-            let evaluate i j =
-                let index = i+b, j+b'
-                if cells.ContainsKey(index) then
-                    let x = cells.[index]
-                    if x.InlineString > -1 then CellContent.InlineString x.InlineString
-                    else if x.CellDataType = 's' then 
-                        CellContent.StringTableIndex (int x.CellValue)
-                    else if x.isCellValueValid then 
-                        if x.StyleIndex > -1 && isCellDateTimeFormat x.StyleIndex then 
-                            CellContent.Date(fromJulianDate (int64 x.CellValue))
-                        else CellContent.Decimal(x.CellValue)
-                    else CellContent.Empty
-                else CellContent.Empty
-            for i in [0 .. (a-b)] do 
-                for j in [0 .. (a'-b')] do 
-                    (!values).[i,j] <- (evaluate i j)
+        let cellContentContext =
+            { log                   = log
+              isCellDateTimeFormat  = isCellDateTimeFormat cellFormats
+              rowOffset             = (fst upperLeft.ToTuple)
+              colOffset             = (snd upperLeft.ToTuple)
+              values                = ref values
+              inlineString          = ref inlineString
+              cellFormula           = ref cellFormula
+              extensionList         = ref extensionList
+              unknownCellFormat     = ref unknownCellFormat }            
+
+        //let fCell index outerXml = setCell3 cellContentContext index outerXml
+        
+        do 
+            logInfo "%s" "Parsing cells ..."
+            parseCell 10000000 (ref sheetString)
+            |> Seq.iteri (fun index outerXml -> setCell3 cellContentContext index outerXml)
+            logInfo "%s" "... parsing cells done."            
+
+        //let sharedStringTable = workbookPart.SharedStringTablePart.SharedStringTable
+        //let sharedStringItems = sharedStringTable.Elements<SharedStringItem'>()
+        let mutable ranges : Range list = []
+        
+        let rows = []
+        let cols = []
 
         new (workbook : Workbook, sheetName: string, editable: bool) = 
             LargeSheet (new Pollux.Log.DefaultLogger(), workbook.FileFullName, sheetName , editable)
@@ -148,11 +148,7 @@
         member x.UpperLeft = upperLeft
         member x.LowerRight = lowerRight
 
-        member x.Values : CellContent [,] = 
-            Array2D.initBased<CellContent> 0 0
-                ((fst (convertCellIndex2 lowerRight)) - (fst (convertCellIndex2 upperLeft)) + 1) 
-                ((snd (convertCellIndex2 lowerRight)) - (snd (convertCellIndex2 upperLeft)) + 1) 
-                (fun i j -> (!values).[i,j])
+        member x.Values = values
 
         member x.Ranges = ranges
         member x.Range (i : Index, j : Index) =
@@ -166,7 +162,7 @@
             | x :: _ -> Some x
             | _ -> None
 
-        member x.Cells () = cells
+        member x.Cells () = ()
         member x.Cells (a, b) = ()
         member x.Cells (rangeObj: obj) = ()
         member x.Cells (rangeName: string) = ()

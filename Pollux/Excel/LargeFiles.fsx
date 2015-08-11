@@ -52,11 +52,11 @@ let sheet3 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums2", false)
 
 
 do
-    parse 1000 "c" (ref ``Übersicht``)
+    parseCell 1000 (ref ``Übersicht``)
     |> Seq.iter (printfn "%s")
 
 do
-    parse 10000000 "c" (ref ``Random``)
+    parseCell 10000000 (ref ``Random``)
     |> Seq.take 5
     |> Seq.iter (printfn "%s")
 
@@ -68,6 +68,49 @@ do
 //    Real: 00:06:13.092, CPU: 00:06:07.578, GC gen0: 72786, gen1: 8089, gen2: 3
 //    val it : unit = ()
 
+
+do
+    let s = 
+        """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x14ac" xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"><dimension ref="A1:H33"/><sheetViews><sheetView showGridLines
+        """ 
+        |> fun x -> x.Substring(0,425)
+        |> ref
+    s
+    |> (Pollux.Excel.Cell.Parser.parse 1 "dimension")
+    |> Seq.head
+    |> fun x -> 
+        let len = x.Length 
+        (x.Substring(0, len - "\"/>".Length)).Substring("<dimension ref=\"".Length).Split([|':'|])
+    |> fun x -> CellIndex.ConvertLabel x.[0], CellIndex.ConvertLabel x.[1]
+    |> printfn "%A"
+
+do
+    let inline isNull x = x = Unchecked.defaultof<_>
+    let xn s = System.Xml.Linq.XName.Get(s)
+    let xd s = System.Xml.Linq.XDocument.Parse(s)
+    let outerXml = """<c r="B1" s="2"><f t="shared" ref="B1:BM2" ca="1" si="0">RANDBETWEEN(0,1000)</f><v>358</v></c>"""
+    let test name = 
+        let x' = (xd outerXml).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
+        if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
+    let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
+    let xa s = test' ((xd outerXml).Root.Attribute(xn s))
+//    let test2 x (y: Dict<int,string>)  = 
+//        let z = test x
+//        if z = "" then -1 
+//        else y.Add (index, z); index
+//    let test3 (x: string) = if (xa x) = "" then -1 else x |> xa |> int
+    let cv, cvb =     
+        if "" = test "v" then -1M,false
+        else
+            try (test "v" |> decimal),true
+            with | _ -> 
+                //logInfo "setCell: ignoring invalid cell '%s'" outerXml
+                -1M,false
+    let rR = xa "r"  |> CellIndex.ConvertLabel |> fst
+    let rC = xa "r"  |> CellIndex.ConvertLabel |> snd
+    printfn "cv '%f' cvb '%b' rR '%d' rC '%d'" cv cvb rR rC
 
 do 
     let findTag (tag: string) (s: string) = s.IndexOf(tag) |> fun x -> if x > -1 then s.Substring(x) else ""
