@@ -36,9 +36,9 @@ let ``Übersicht`` =
     __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2\xl\worksheets\sheet1.xml"
     |> fun x -> System.IO.File.ReadAllText(x)
 
-let ``Random`` =
-    __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows\xl\worksheets\sheet1.xml"
-    |> fun x -> System.IO.File.ReadAllText(x)
+//let ``Random`` =
+//    __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows\xl\worksheets\sheet1.xml"
+//    |> fun x -> System.IO.File.ReadAllText(x)
 
 
 let ``Cost Summary2.xlsx``  = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2.xlsx"
@@ -49,6 +49,65 @@ let ``Cost Summary2_3.txt`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost
 let sheet = LargeSheet (``Cost Summary2.xlsx``, "Übersicht", false)
 let sheet2 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums", false)
 let sheet3 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums2", false)
+
+
+
+do
+    let i2',j2' = sheet2.UpperLeft.ToTuple
+    [ for i in [0 .. sheet2.Values.GetUpperBound(0)] do
+            for j in [0 .. sheet2.Values.GetUpperBound(1)] do
+                yield if sheet2.Values.[i,j] <> CellContent.Empty 
+                    then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) sheet2.Values.[i,j];
+                    else "" ]
+    |> String.concat ""
+    |> printfn "%s"
+
+do
+    let i2',j2' = sheet2.UpperLeft.ToTuple
+    let range' : Range = 
+        {  Name = "Cost Summary2.xlsx : CheckSums"
+           UpperLeft  = sheet2.UpperLeft.ToTuple
+           LowerRight = sheet2.LowerRight.ToTuple
+           Values = sheet2.Values }
+    let range = (Pollux.Excel.Range.RangeWithCheckSumsRow (range')).Range
+    [ for i in [0 .. range.Values.GetUpperBound(0)] do
+            for j in [0 .. range.Values.GetUpperBound(1)] do
+                yield sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) range.Values.[i,j]; ]
+    |> String.concat ""
+    |> printfn "%s"
+
+
+
+
+do
+    let sheet2 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums", false)
+    let i2',j2' = sheet2.UpperLeft.ToTuple
+    let range' : Range = 
+        {  Name = "Cost Summary2.xlsx : CheckSums"
+           UpperLeft  = sheet2.UpperLeft.ToTuple
+           LowerRight = sheet2.LowerRight.ToTuple
+           Values = sheet2.Values }
+    let range = (RangeWithCheckSumsRow (range')).Range
+    [ for i in [0 .. sheet2.Values.GetUpperBound(0)] do
+            for j in [0 .. sheet2.Values.GetUpperBound(1)] do
+                yield sprintf "%s %A %A\r\n" (convertIndex (i+i2') (j+j2')) sheet2.Values.[i,j] range.Values.[i,j]; ]
+    |> String.concat ""
+    |> printfn "%s"
+    [| for col in [0 .. range.Values.GetUpperBound(1)] do
+            yield [| for row in [0 .. range.Values.GetUpperBound(0) - 1] do 
+                        yield range.Values.[row,col] |] |> Array.reduce (+) |> sprintf "%A" |]
+    |> String.concat "\n"
+    |> printfn "%s"    
+    printfn ""
+    [| for row in [0 .. range.Values.GetUpperBound(0)] do
+            yield [| for col in [0 .. range.Values.GetUpperBound(1) - 1] do 
+                        yield range.Values.[row,col] |] |> Array.reduce (+) |> sprintf "%A" |]
+    |> String.concat "\n"
+    |> printfn "%s"    
+
+
+
+
 
 
 do

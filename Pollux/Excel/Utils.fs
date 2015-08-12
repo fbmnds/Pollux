@@ -211,8 +211,6 @@ let setCell3 (ctx : CellContentContext) index outerXml =
             ValueMetadataIndex = test3 "vm" }
         |> Some
     with _ -> 
-            let msg = sprintf "failed in setCell3:\ncell '%s'" outerXml
-            ctx.log.LogLine Pollux.Log.Error "%A" msg
             (!ctx.unknownCellFormat).Add(index,outerXml)
             None
     |> fun x -> 
@@ -232,7 +230,7 @@ let setCell3 (ctx : CellContentContext) index outerXml =
     |> fun (rR,rC,x) -> 
         try
             (!ctx.values).[rR-ctx.rowOffset,rC-ctx.colOffset] <- x
-        with _ -> 
-            let msg = sprintf "failed in setCell3:\ncell '%A'" x 
-            ctx.log.LogLine Pollux.Log.Error "%s" msg
+        with _ -> ()
+//            let msg = sprintf "failed in setCell3:\ncell '%A'" x 
+//            ctx.log.LogLine Pollux.Log.Error "%s" msg
             

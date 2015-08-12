@@ -18,8 +18,9 @@ let main argv =
     let ``file6000rows.xlsx`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows.xlsx"
 
     try 
-        let sheet = LargeSheet ((new ConsoleLogger() :> ILogger), ``file6000rows.xlsx``, "Random", false)
-        Pollux.Log.logInfo "%A" sheet.UpperLeft
+        let sheet = LargeSheet ((new ConsoleLogger() :> ILogger), ``file6000rows.xlsx``, "Fix", false)
+        Pollux.Log.logInfo "upperLeft %A" sheet.UpperLeft
+        Pollux.Log.logInfo "%A" sheet.LowerRight
     with _ -> Pollux.Log.logError "failed LargeSheet '%s'" ``file6000rows.xlsx``
     let x = System.Console.ReadKey() 
     0

@@ -120,9 +120,20 @@
         //let fCell index outerXml = setCell3 cellContentContext index outerXml
         
         do 
+            let parseAgent = 
+                new Agent<CellContentContext*string>(fun x -> 
+                    let index' = ref -1
+                    let rec loop () =
+                        async { let index = System.Threading.Interlocked.Increment(index')
+                                let! ctx,outerXml = x.Receive()
+                                do setCell3 ctx index outerXml
+                                return! loop () }
+                    loop () )
             logInfo "%s" "Parsing cells ..."
+            parseAgent.Start()
             parseCell 10000000 (ref sheetString)
-            |> Seq.iteri (fun index outerXml -> setCell3 cellContentContext index outerXml)
+            |> Seq.iter (fun outerXml -> parseAgent.Post (cellContentContext,outerXml))
+            while parseAgent.CurrentQueueLength > 0 do ()
             logInfo "%s" "... parsing cells done."            
 
         //let sharedStringTable = workbookPart.SharedStringTablePart.SharedStringTable
@@ -148,7 +159,7 @@
         member x.UpperLeft = upperLeft
         member x.LowerRight = lowerRight
 
-        member x.Values = values
+        member x.Values = values            
 
         member x.Ranges = ranges
         member x.Range (i : Index, j : Index) =

@@ -106,7 +106,7 @@ module Basics =
                UpperLeft  = sheet2.UpperLeft.ToTuple
                LowerRight = sheet2.LowerRight.ToTuple
                Values = sheet2.Values }
-        Pollux.Excel.Range.RangeWithCheckSumsRow (range')
+        RangeWithCheckSumsRow (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
         |> fun (x,y,z) -> 
             should (equalWithin 0.000001) sums x,

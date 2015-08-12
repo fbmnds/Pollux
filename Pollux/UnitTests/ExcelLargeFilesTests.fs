@@ -2,7 +2,6 @@
 
 module LargeFiles =
 
-
     open FsUnit
     open NUnit.Framework
 
@@ -56,6 +55,30 @@ module LargeFiles =
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : UpperLeft : 3``() =
         sheet3.UpperLeft |> should equal (Index(0,1))
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : GetUpperBound(0) : 1``() =
+        sheet.Values.GetUpperBound(0) |> should equal 32
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : GetUpperBound(0) : 2``() =
+        sheet2.Values.GetUpperBound(0) |> should equal 28
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : GetUpperBound(0) : 3``() =
+        sheet3.Values.GetUpperBound(0) |> should equal 28
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : GetUpperBound(1) : 1``() =
+        sheet.Values.GetUpperBound(1) |> should equal 7
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : GetUpperBound(1) : 2``() =
+        sheet2.Values.GetUpperBound(1) |> should equal 7
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : GetUpperBound(1) : 3``() =
+        sheet3.Values.GetUpperBound(1) |> should equal 7
 
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : LowerRight : 1``() =
@@ -114,13 +137,15 @@ module LargeFiles =
                UpperLeft  = sheet2.UpperLeft.ToTuple
                LowerRight = sheet2.LowerRight.ToTuple
                Values = sheet2.Values }
-        Pollux.Excel.Range.RangeWithCheckSumsRow (range')
+        RangeWithCheckSumsRow (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
         |> fun (x,y,z) -> 
             should (equalWithin 0.000001) sums x,
             should equal results y,
             should equal errors z
         |> ignore
+
+
 
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : RangeWithCheckSumsRow : Values : 2``() =

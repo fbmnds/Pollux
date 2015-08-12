@@ -173,3 +173,4 @@
         member x.FileFullName = fileFullName
 
 
+    type Agent<'T1> = MailboxProcessor<'T1>
