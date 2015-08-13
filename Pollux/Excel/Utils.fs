@@ -7,6 +7,7 @@ open Pollux.Log
 open Pollux.Excel
 #endif
 
+open Pollux.Excel.Cell.Parser
 
 open FParsec
 
@@ -56,12 +57,31 @@ let inline toJulianDate (x : System.DateTime) =
     (x.ToBinary() - 599264352000000000L) / 864000000000L
 
 
+let getDimensions (log : Pollux.Log.ILogger) (fileName : string) sheetName s = 
+    try
+        parseUnsafe 1 "dimension" (ref s)
+        |> Seq.head
+        |> fun x -> 
+            let len = x.Length 
+            (x.Substring(0, len - "\"/>".Length)).Substring("<dimension ref=\"".Length).Split([|':'|])
+        |> fun x -> 
+            let upperLeft = Index(CellIndex.ConvertLabel x.[0])
+            let lowerRight = Index(CellIndex.ConvertLabel x.[1])
+            let rowCapacity = (fst (convertCellIndex2 lowerRight)) - (fst (convertCellIndex2 upperLeft)) + 1
+            let colCapacity = (snd (convertCellIndex2 lowerRight)) - (snd (convertCellIndex2 upperLeft)) + 1
+            upperLeft, lowerRight, rowCapacity, colCapacity
+    with _ -> 
+        let msg = sprintf "LargeSheet: could not read 'dimension' of sheet '%s' in '%s'" sheetName fileName
+        log.LogLine Pollux.Log.LogLevel.Error "%s" msg
+        failwith msg
+
+
 let inline id2 (i: int) (x: 'T) = x
 
-let inline getPart1' (log : Pollux.Log.ILogger) 
+let inline getPart (log : Pollux.Log.ILogger) 
                    (fileName : string) (xPath : string) (partUri : string) f = 
     log.LogLine Pollux.Log.LogLevel.Info 
-        "Beginning 'getPart1\'' with xPath %s, partUri %s" xPath partUri
+        "Beginning 'getPart' with xPath %s, partUri %s" xPath partUri
     use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
     let part = 
         xlsx.GetParts()
@@ -80,65 +100,105 @@ let inline getPart1' (log : Pollux.Log.ILogger)
                     while nodes.MoveNext() do
                         yield (f !i nodes.Current.OuterXml)
                         i := !i+1 
-                | _ -> failwith <| sprintf "'getPart1\'': unexpected XPath-Expression return type '%A'" expression.ReturnType
+                | _ -> failwith <| sprintf "'getPart': unexpected XPath-Expression return type '%A'" expression.ReturnType
         |]
     log.LogLine Pollux.Log.LogLevel.Info 
-        "'getPart1\'' with xPath %s, partUri %s finished" xPath partUri
-    result
-
-let inline getPart2 (log : Pollux.Log.ILogger) 
-                   (fileName : string) (xPath : string) (partUri : string) f = 
-    log.LogLine Pollux.Log.LogLevel.Info 
-        "Beginning 'getPart2' with xPath %s, partUri %s" xPath partUri
-    use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
-    let part = 
-        xlsx.GetParts()
-        |> Seq.filter (fun x -> x.Uri.ToString() = partUri)
-        |> Seq.head
-    use stream = part.GetStream(System.IO.FileMode.Open, System.IO.FileAccess.Read)
-    let xml = new XPathDocument(stream)
-    let navigator = xml.CreateNavigator()
-    let manager = new XmlNamespaceManager(navigator.NameTable)
-    let expression = XPathExpression.Compile(xPath, manager)
-    let i = ref 0
-    let result = 
-        seq { match expression.ReturnType with
-                | XPathResultType.NodeSet -> 
-                    let nodes = navigator.Select(expression)
-                    while nodes.MoveNext() do
-                        yield (f !i nodes.Current.OuterXml)
-                        i := !i+1 
-                | _ -> failwith <| sprintf "'getPart2': unexpected XPath-Expression return type '%A'" expression.ReturnType
-        }
-    log.LogLine Pollux.Log.LogLevel.Info 
-        "'getPart2' with xPath %s, partUri %s finished" xPath partUri
+        "'getPart' with xPath %s, partUri %s finished" xPath partUri
     result
 
 let xn s = System.Xml.Linq.XName.Get(s)
 let xd s = System.Xml.Linq.XDocument.Parse(s)
+let test x name = 
+    let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
+    if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
+let test' (x: System.Xml.Linq.XAttribute) =
+    if (isNull x || isNull x.Value) then "" else x.Value
+let xa x s = test' ((xd x).Root.Attribute(xn s))
 
 
 let getSheetId (log : Pollux.Log.ILogger) (fileName : string) (sheetName : string) =
     let partUri = "/xl/workbook.xml"
     let xPath = (sprintf "//*[name()='sheet' and @name='%s']" sheetName)
-    getPart2 (log : Pollux.Log.ILogger) fileName xPath partUri id2
+    getPart (log : Pollux.Log.ILogger) fileName xPath partUri id2
     |> Seq.head
     |> fun x -> 
         (xd x).Root.Attribute(xn "sheetId").Value
 
-type CellContentContext =
-    { log                  : Pollux.Log.ILogger 
-      isCellDateTimeFormat : int -> bool
-      rowOffset            : int
-      colOffset            : int
-      values               : CellContent [,] ref
-      inlineString         : Dict<int,string> ref
-      cellFormula          : Dict<int,string> ref
-      extensionList        : Dict<int,string> ref
-      unknownCellFormat    : Dict<int,string> ref }
+let getNumberFormats (log : Pollux.Log.ILogger) (fileName : string) = 
+    log.LogLine Pollux.Log.LogLevel.Info
+        "%s" "upperLeft, lowerRight, keys finished,  beginning with numberFormats ..."
+    let partUri = "/xl/styles.xml"
+    let numberFormats = 
+        let xPath = "//*[name()='numFmt']"
+        getPart log fileName xPath partUri id2
+        |> Seq.map (fun x ->             
+            { NumberFormatId = xa x "numFmtId"; FormatCode = xa x "formatCode" })
+    log.LogLine Pollux.Log.LogLevel.Info 
+        "%s" "numberFormats finished,  beginning with cellFormats ..."
+    numberFormats
+
+let getCellFormats (log : Pollux.Log.ILogger) (fileName : string) =
+    let partUri = "/xl/styles.xml"
+    let xPath = "//*[name()='cellXfs']/*[name()='xf']"
+    getPart log fileName xPath partUri id2
+    |> Seq.mapi (fun i x ->                 
+        i,
+        { NumFmtId          = xa x "numFmtId";
+          BorderId          = xa x "borderId"
+          FillId            = xa x "fillId";
+          FontId            = xa x "fontId"; 
+          ApplyAlignment    = xa x "applyAlignment";
+          ApplyBorder       = xa x "applyBorder";
+          ApplyFont         = xa x "applyFont";
+          XfId              = xa x "xfId";
+          ApplyNumberFormat = xa x "applyNumberFormat" })                             
+    |> Map.ofSeq
+
+let parseDefinedNames (x: string) = 
+    let errMsg = (sprintf "ERROR:unexpected 'definedName' format:VALUE:%s" x),(-1,-1),(-1,-1)
+    try
+        let name = xa x "name"
+        (xd x).Root.Value.Split('!')
+        |> fun x -> 
+            (x.[1]).Replace("$","").Split(':') 
+            |> fun y ->             
+                let upperLeft = y.[0] |> CellIndex.ConvertLabel
+                if      y.Length = 2 then name, upperLeft, y.[1] |> CellIndex.ConvertLabel
+                else if y.Length = 1 then name, upperLeft, upperLeft
+                else errMsg
+    with _ -> errMsg
+
+let getDefinedNames (log : Pollux.Log.ILogger) sheetGuid (fileName : string) =
+    let partUri = "/xl/workbook.xml"
+    let xPath = "//*[name()='definedNames']/*[name()='definedName']"
+    getPart log fileName xPath partUri id2
+    |> Seq.map (fun x ->                 
+        let name,upperLeft,lowerRight = parseDefinedNames x
+        name,
+        { Name       = name
+          UpperLeft  = upperLeft
+          LowerRight = lowerRight
+          SheetGuid  = sheetGuid })                             
+    |> Map.ofSeq
+
+let GetCellDateTimeFormats numberFormats = 
+    numberFormats   
+    |> Seq.filter (fun x -> x.FormatCode |> isDateTime)
+    |> Seq.map (fun x -> x.NumberFormatId)
+    |> Seq.append builtInDateTimeNumberFormatIDs 
+
+let fIsCellDateTimeFormat (cellFormats : Map<int,CellFormat>) cellDateTimeFormats =
+    fun x -> 
+        if cellFormats.ContainsKey (x) then 
+            cellDateTimeFormats
+            |> Seq.filter (fun x' -> x' = (cellFormats.[x]).NumFmtId)
+            |> Seq.isEmpty
+            |> not
+        else false
 
 let setCell i x (log : #Pollux.Log.ILogger)
-    (inlineString: Dict<int,string> ref) (cellFormula: Dict<int,string> ref ) (extensionList: Dict<int,string> ref) = 
+    (inlineString: Dict<int,string> ref) (inlineString2: Dict<int,string> ref)
+    (cellFormula: Dict<int,string> ref ) (extensionList: Dict<int,string> ref) = 
     let info = Pollux.Log.LogLevel.Info
     let test name = 
         let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
@@ -163,6 +223,7 @@ let setCell i x (log : #Pollux.Log.ILogger)
         {   isCellValueValid   = cvb
             CellValue          = cv
             InlineString       = test2 "is" !inlineString
+            InlineString2      = if cvb |> not && (xa "s") = "6" then (!inlineString2).Add (i, (xa "r")) ; i else -1
             CellFormula        = test2 "f" !cellFormula
             ExtensionList      = test2 "extLst" !extensionList
             UnknownCellFormat  = -1
@@ -198,7 +259,9 @@ let setCell3 (ctx : CellContentContext) index outerXml =
         let rC = xa "r"  |> CellIndex.ConvertLabel |> snd
         {   isCellValueValid   = cvb
             CellValue          = cv
+            //CellValueString    = 
             InlineString       = test2 "is" !(ctx.inlineString)
+            InlineString2      = if cvb |> not && (xa "s") = "6" then (!ctx.inlineString2).Add (index, (xa "r")) ; index else -1 
             CellFormula        = test2 "f" !(ctx.cellFormula)
             ExtensionList      = test2 "extLst" !(ctx.extensionList)
             UnknownCellFormat  = -1
@@ -217,7 +280,8 @@ let setCell3 (ctx : CellContentContext) index outerXml =
         match x with
         | Some x -> 
             let c =  
-                if x.InlineString > -1 then CellContent.InlineString x.InlineString
+                if x.InlineString2 > -1 then CellContent.InlineString2 x.InlineString2
+                else if x.InlineString > -1 then CellContent.InlineString x.InlineString
                 else if x.CellDataType = 's' then 
                     CellContent.StringTableIndex (int x.CellValue)
                 else if x.isCellValueValid then 

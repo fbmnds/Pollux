@@ -71,6 +71,10 @@
             | Label x -> CellIndex.ConvertLabel x
             | Index x -> (fst x), (snd x)
 
+        member x.Row = x.ToTuple |> fst
+
+        member x.Col = x.ToTuple |> snd
+
         override x.GetHashCode() = x.GetHashCode()
 
         override x.Equals(y) =
@@ -104,17 +108,29 @@
     type CellContent =
     | StringTableIndex  of int
     | InlineString      of int
+    | InlineString2     of int
     | Decimal           of decimal
     | Date              of System.DateTime
     | Pending    
     | Empty      
-
+    and CellContentContext =
+        { log                  : Pollux.Log.ILogger 
+          isCellDateTimeFormat : int -> bool
+          rowOffset            : int
+          colOffset            : int
+          values               : CellContent [,] ref
+          inlineString         : Dict<int,string> ref
+          inlineString2        : Dict<int,string> ref
+          cellFormula          : Dict<int,string> ref
+          extensionList        : Dict<int,string> ref
+          unknownCellFormat    : Dict<int,string> ref }
     
     [<CustomEquality; NoComparison; CLIMutable>]
     type Cell = 
         { isCellValueValid   : bool
           CellValue          : decimal
           InlineString       : int
+          InlineString2      : int
           CellFormula        : int
           ExtensionList      : int
           UnknownCellFormat  : int
@@ -152,20 +168,27 @@
 
     type Range =
         { mutable Name : string 
+          DefinedName  : DefinedName option
           UpperLeft    : Index
           LowerRight   : Index
           Values       : CellContent [,] }
     and StringRange = 
         { mutable Name : string 
+          DefinedName  : DefinedName option
           UpperLeft    : Index
           LowerRight   : Index
           Values       : string [,] }
     and DecimalRange = 
         { mutable Name : string 
+          DefinedName  : DefinedName option
           UpperLeft    : Index
           LowerRight   : Index
           Values       : decimal [,] }
-
+    and DefinedName =
+        { Name         : string
+          UpperLeft    : Index
+          LowerRight   : Index
+          SheetGuid    : System.Guid }
     
     // for backward compatibility
     type Workbook (fileName : string, editable: bool) =        

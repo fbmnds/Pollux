@@ -20,52 +20,54 @@ type ILogger =
 //#endregion
 
 
-let now () = 
+let now level = 
     (System.DateTime.UtcNow.TimeOfDay.Hours, 
      System.DateTime.UtcNow.TimeOfDay.Minutes,
      System.DateTime.UtcNow.TimeOfDay.Seconds) 
-    |> fun (h,m,s) -> sprintf "[%02d:%02d:%02d UTC] " h m s
+    |> fun (h,m,s) -> sprintf "[%02d:%02d:%02d UTC | '%s' ] " h m s level
 
+let mutable private conbg = Console.BackgroundColor
+let mutable private confg = Console.ForegroundColor
 
-let cprintf bg fg fmt =
-  Console.Write(now())
+let cprintf level bg fg fmt =
+  Console.Write(now level)
   Printf.kprintf
     (fun s ->
-      let restoreBackgroundColor = Console.BackgroundColor
-      let restoreForegroundColor = Console.ForegroundColor
-      Console.BackgroundColor <- bg
-      Console.ForegroundColor <- fg
+      let restoreBackgroundColor = conbg
+      let restoreForegroundColor = confg
+      conbg <- bg
+      confg <- fg
       Console.Write(s)
-      Console.BackgroundColor <- restoreBackgroundColor
-      Console.ForegroundColor <- restoreForegroundColor)
+      conbg <- restoreBackgroundColor
+      confg <- restoreForegroundColor)
     fmt
 
-let cprintfn bg fg fmt =
-  Console.Write(now())
+let cprintfn level bg fg fmt =
+  Console.Write(now level)
   Printf.kprintf
     (fun s ->
-      let restoreBackgroundColor = Console.BackgroundColor
-      let restoreForegroundColor = Console.ForegroundColor
-      Console.BackgroundColor <- bg
-      Console.ForegroundColor <- fg
+      let restoreBackgroundColor = conbg
+      let restoreForegroundColor = confg
+      conbg <- bg
+      confg <- fg
       Console.WriteLine(s)
-      Console.BackgroundColor <- restoreBackgroundColor
-      Console.ForegroundColor <- restoreForegroundColor)
+      conbg <- restoreBackgroundColor
+      confg <- restoreForegroundColor)
     fmt
 
 /// ILogger log-to-console implementation
 type ConsoleLogger() =
   let log level format =
     match level with
-    | Error -> cprintf Console.BackgroundColor ConsoleColor.DarkRed format
-    | Warning -> cprintf Console.BackgroundColor ConsoleColor.DarkYellow format
-    | Info -> cprintf Console.BackgroundColor Console.ForegroundColor format
+    | Error -> cprintf "ERROR" conbg ConsoleColor.Red format
+    | Warning -> cprintf "WARN" conbg ConsoleColor.DarkYellow format
+    | Info -> cprintf "INFO" conbg confg format
 
   let logLine level format =
     match level with
-    | Error -> cprintfn Console.BackgroundColor ConsoleColor.DarkRed format
-    | Warning -> cprintfn Console.BackgroundColor ConsoleColor.DarkYellow format
-    | Info -> cprintfn Console.BackgroundColor Console.ForegroundColor format
+    | Error -> cprintfn "ERROR" conbg ConsoleColor.Red format
+    | Warning -> cprintfn "WARN" conbg ConsoleColor.DarkYellow format
+    | Info -> cprintfn "INFO" conbg confg format
 
   interface ILogger with
     member x.Log level format = log level format
@@ -73,16 +75,16 @@ type ConsoleLogger() =
     member x.Dispose() = ()
 
 
-/// ILogger do-not-log implementation
+/// ILogger ignore-log implementation
 type DefaultLogger() =
   interface ILogger with
     member x.Log level format = Printf.kprintf (fun s -> ()) format
     member x.LogLine level format = Printf.kprintf (fun s -> ()) format
     member x.Dispose() = ()
 
-let consoleLogger = (new ConsoleLogger() :> ILogger)
-let logError format = consoleLogger.LogLine LogLevel.Error format
+let consoleLogger     = (new ConsoleLogger() :> ILogger)
+let logError format   = consoleLogger.LogLine LogLevel.Error format
 let logWarning format = consoleLogger.LogLine LogLevel.Warning format
-let logInfo format = consoleLogger.Log LogLevel.Info format
+let logInfo format    = consoleLogger.Log LogLevel.Info format
 
 

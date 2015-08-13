@@ -37,18 +37,20 @@ module Range =
                 Label(Utils.convertIndex (fst range.LowerRight) (j + (snd range.UpperLeft))))
 
         new (range : Range, conversion) =
-            new RangeWithCheckSumsRow (
+            let range' : DecimalRange = 
                 {  Name = range.Name
+                   DefinedName = range.DefinedName
                    UpperLeft = range.UpperLeft
                    LowerRight = range.LowerRight
-                   Values = range.Values |> Array2D.mapi (fun i j x -> (conversion i j x)) } )
+                   Values = range.Values |> Array2D.mapi (fun i j x -> (conversion i j x)) }
+            new RangeWithCheckSumsRow (range')
 
         new (range : Range, conversion) =
             new RangeWithCheckSumsRow (range, (fun _ _ x -> conversion x))
 
         new (range : Range) =
             let defaultConversion = function
-            | StringTableIndex _ | Date _ | InlineString _ | Pending | Empty -> 0M
+            | StringTableIndex _ | Date _ | InlineString _ | InlineString2 _ | Pending | Empty -> 0M
             | Decimal x -> x
             new RangeWithCheckSumsRow (range, (fun x -> defaultConversion x))
         
@@ -86,18 +88,20 @@ module Range =
                 Label(Utils.convertIndex (i + (fst range.UpperLeft)) (snd range.LowerRight)))
 
         new (range : Range, conversion) =
-            new RangeWithCheckSumsCol (
+            let range' : DecimalRange = 
                 {  Name = range.Name
+                   DefinedName = range.DefinedName
                    UpperLeft = range.UpperLeft
                    LowerRight = range.LowerRight
-                   Values = range.Values |> Array2D.mapi (fun i j x -> (conversion i j x)) } )
+                   Values = range.Values |> Array2D.mapi (fun i j x -> (conversion i j x)) }
+            new RangeWithCheckSumsCol (range')
 
         new (range : Range, conversion) =
             new RangeWithCheckSumsCol (range, (fun _ _ x -> conversion x))
 
         new (range : Range) =
             let defaultConversion = function
-            | StringTableIndex _ | Date _ | InlineString _ | Pending | Empty -> 0M
+            | StringTableIndex _ | Date _ | InlineString _ | InlineString2 _ | Pending | Empty -> 0M
             | Decimal x -> x
             new RangeWithCheckSumsCol (range, (fun x -> defaultConversion x))
 

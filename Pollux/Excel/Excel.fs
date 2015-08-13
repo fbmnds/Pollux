@@ -1,118 +1,97 @@
 ﻿namespace Pollux.Excel
 
+
 #if INTERACTIVE
     open Pollux.Log
     open Pollux.Excel
 #endif
     open Pollux.Excel.Utils
+    open Pollux.Excel.Cell.Parser
+    open System.IO.Packaging
 
-    type Sheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
-        let sheetName = sheetName
-        let logInfo format = log.LogLine Pollux.Log.LogLevel.Info format
-        let logError format = log.LogLine Pollux.Log.LogLevel.Error format
-        let inlineString  = ref (Dict<int,string>())
-        let cellFormula   = ref (Dict<int,string>())
-        let extensionList = ref (Dict<int,string>())
+    type LargeSheet (log : Pollux.Log.ILogger, fileName : string, sheetName: string, editable: bool) =
+        let sheetGuid = System.Guid.NewGuid()
+        let logInfo  format  = log.LogLine Pollux.Log.LogLevel.Info  format
+        let logError format  = log.LogLine Pollux.Log.LogLevel.Error format
+        let dimensionSearchRange = 1000
+        let largeSheetCapacityUnit = 10000000
 
-        let fCell i x = setCell i x log inlineString cellFormula extensionList 
+        let sheetString =
+            logInfo "%s" "LargeSheet : reading worksheet ..."
+            let partUri =  sprintf "/xl/worksheets/sheet%s.xml" (getSheetId log fileName sheetName)
+            use xlsx = ZipPackage.Open(fileName, System.IO.FileMode.Open, System.IO.FileAccess.Read)
+            let part = 
+                xlsx.GetParts()
+                |> Seq.filter (fun x -> x.Uri.ToString() = partUri)
+                |> Seq.head
+            use stream = part.GetStream(System.IO.FileMode.Open, System.IO.FileAccess.Read)        
+            use reader = new System.IO.StreamReader(stream,System.Text.Encoding.UTF8)
+            let s = reader.ReadToEnd()
+            logInfo "%s" "LargeSheet : reading worksheet done"
+            s
+
+        let upperLeft, lowerRight, rowCapacity, colCapacity = 
+            getDimensions log fileName sheetName (sheetString.Substring(0,dimensionSearchRange))
+
+        let values = 
+            Array2D.createBased<CellContent> 0 0 rowCapacity colCapacity CellContent.Empty            
+        let inlineString      = Dict<int,string>()
+        let inlineString2     = Dict<int,string>()
+        let cellFormula       = Dict<int,string>()
+        let extensionList     = Dict<int,string>()
+        let unknownCellFormat = Dict<int,string>()
+
+        let numberFormats = getNumberFormats log fileName
+
+        let cellFormats = getCellFormats log fileName
+
+        let mutable cellDateTimeFormats = GetCellDateTimeFormats numberFormats
         
-        let cells =
-            let partUri = sprintf "/xl/worksheets/sheet%s.xml" (getSheetId log fileName sheetName)
-            let xPath = "//*[name()='c']"
-            logInfo "Reading cells from %s, sheet %s in part %s:" fileName sheetName partUri
-            getPart1' log fileName xPath partUri fCell
-            |> dict
+        let isCellDateTimeFormat = fIsCellDateTimeFormat cellFormats cellDateTimeFormats
+
+        let cellContentContext =
+            { log                   = log
+              isCellDateTimeFormat  = isCellDateTimeFormat
+              rowOffset             = (fst upperLeft.ToTuple)
+              colOffset             = (snd upperLeft.ToTuple)
+              values                = ref values
+              inlineString          = ref inlineString
+              inlineString2         = ref inlineString2
+              cellFormula           = ref cellFormula
+              extensionList         = ref extensionList
+              unknownCellFormat     = ref unknownCellFormat }            
+       
+        do 
+            let parseAgent = 
+                new Agent<CellContentContext*string>(fun x -> 
+                    let index' = ref -1
+                    let rec loop () =
+                        async { let index = System.Threading.Interlocked.Increment(index')
+                                let! ctx,outerXml = x.Receive()
+                                do setCell3 ctx index outerXml
+                                return! loop () }
+                    loop () )
+            logInfo "%s" "LargeSheet : parsing cells ..."
+            parseAgent.Start()
+            parseCell largeSheetCapacityUnit (ref sheetString)
+            |> Seq.iter (fun outerXml -> parseAgent.Post (cellContentContext,outerXml))
+            while parseAgent.CurrentQueueLength > 0 do ()
+            logInfo "%s" "LargeSheet : parsing cells done"            
 
         //let sharedStringTable = workbookPart.SharedStringTablePart.SharedStringTable
         //let sharedStringItems = sharedStringTable.Elements<SharedStringItem'>()
-        let mutable ranges : Range list = []
+        let definedNames = getDefinedNames log sheetGuid fileName
+
+        let ranges = getDefinedNames log sheetGuid fileName
         
         let rows = []
         let cols = []
 
-        let upperLeft, lowerRight, keys =
-            logInfo "%s" "Beginning with upperLeft, lowerRight, keys ..." 
-            let keys = cells.Keys
-            let minX,maxX,minY,maxY =
-                keys 
-                |> Seq.fold (fun (minX,maxX,minY,maxY) (x,y) -> 
-                    min x minX, max x maxX, min y minY, max y maxY) 
-                    (System.Int32.MaxValue,System.Int32.MinValue,System.Int32.MaxValue,System.Int32.MinValue)
-            Index(minX, minY), Index(maxX,maxY), keys |> Seq.map (fun x -> Index(x))
-
-        let numberFormats, cellFormats = 
-            logInfo "%s" "upperLeft, lowerRight, keys finished,  beginning with numberFormats ..."
-            let partUri = "/xl/styles.xml"
-            let numberFormats = 
-                let xPath = "//*[name()='numFmt']"
-                getPart2 log fileName xPath partUri id2
-                |> Seq.map (fun x -> 
-                    let test' (x: System.Xml.Linq.XAttribute) = 
-                        if (isNull x || isNull x.Value) then "" else x.Value
-                    let xa s = test' ((xd x).Root.Attribute(xn s))
-                    { NumberFormatId = xa "numFmtId"; FormatCode = xa "formatCode" })
-            logInfo "%s" "numberFormats finished,  beginning with cellFormats ..."
-            let cellFormats = 
-                let xPath = "//*[name()='cellXfs']/*[name()='xf']"
-                getPart2 log fileName xPath partUri id2
-                |> Seq.mapi (fun i x ->                 
-                    let test' (x: System.Xml.Linq.XAttribute) = 
-                        if (isNull x || isNull x.Value) then "" else x.Value
-                    let xa s = test' ((xd x).Root.Attribute(xn s))
-                    i,
-                    { NumFmtId          = xa "numFmtId";
-                      BorderId          = xa "borderId"
-                      FillId            = xa "fillId";
-                      FontId            = xa "fontId"; 
-                      ApplyAlignment    = xa "applyAlignment";
-                      ApplyBorder       = xa "applyBorder";
-                      ApplyFont         = xa "applyFont";
-                      XfId              = xa "xfId";
-                      ApplyNumberFormat = xa "applyNumberFormat" })                             
-                |> Map.ofSeq
-            numberFormats, cellFormats
-
-        let mutable cellDateTimeFormats = 
-            logInfo "%s" "cellFormats finished,  beginning with cellDateTimeFormats ..."
-            numberFormats   
-            |> Seq.filter (fun x -> x.FormatCode |> isDateTime)
-            |> Seq.map (fun x -> x.NumberFormatId)
-            |> Seq.append builtInDateTimeNumberFormatIDs 
-        
-        let isCellDateTimeFormat x =
-            if cellFormats.ContainsKey (x) then 
-                cellDateTimeFormats
-                |> Seq.filter (fun x' -> x' = (cellFormats.[x]).NumFmtId)
-                |> Seq.isEmpty
-                |> not
-            else false
-
-        let values =
-            logInfo "%s" "Building values ..."
-            let a,a' = Sheet.ConvertCellIndex2 lowerRight
-            let b,b' = Sheet.ConvertCellIndex2 upperLeft 
-            let evaluate i j =
-                let index = i+b, j+b'
-                if cells.ContainsKey(index) then
-                    let x = cells.[index]
-                    if x.InlineString > -1 then CellContent.InlineString x.InlineString
-                    else if x.CellDataType = 's' then 
-                        CellContent.StringTableIndex (int x.CellValue)
-                    else if x.isCellValueValid then 
-                        if x.StyleIndex > -1 && isCellDateTimeFormat x.StyleIndex then 
-                            CellContent.Date(fromJulianDate (int64 x.CellValue))
-                        else CellContent.Decimal(x.CellValue)
-                    else CellContent.Empty
-                else CellContent.Empty
-            array2D [| for i in [0 .. (a-b)] do 
-                            yield [ for j in [0 .. (a'-b')] do 
-                                       yield (evaluate i j) ] |]
-
         new (workbook : Workbook, sheetName: string, editable: bool) = 
-            Sheet (new Pollux.Log.DefaultLogger(), workbook.FileFullName, sheetName , editable)
+            LargeSheet (new Pollux.Log.DefaultLogger(), workbook.FileFullName, sheetName , editable)
 
         new (fileName : string, sheetName: string, editable: bool) = 
-            Sheet (new Pollux.Log.DefaultLogger(), fileName, sheetName , editable)
+            LargeSheet (new Pollux.Log.DefaultLogger(), fileName, sheetName , editable)
 
         static member ConvertCellIndex = convertCellIndex
 
@@ -124,21 +103,27 @@
         member x.UpperLeft = upperLeft
         member x.LowerRight = lowerRight
 
-        member x.Values : CellContent [,] = values
+        member x.Values = values            
 
         member x.Ranges = ranges
-        member x.Range (i : Index, j : Index) =
-            match  ranges |> List.filter (fun r -> r.UpperLeft = i && r.LowerRight = j) with
-            | x :: _ -> x
-            | _ -> let name = sprintf "%A:%A" (convertIndex2 i) (convertIndex2 j)
-                   let range : Range = { Name = name; UpperLeft = i; LowerRight = j; Values = array2D [||] }
-                   ranges <- List.append ranges [ range ]; range               
-        member x.Range (name) = 
-            match  ranges |> List.filter (fun r -> r.Name = name) with
-            | x :: _ -> Some x
-            | _ -> None
+        member x.RangeValues rangeName = 
+            match rangeName |> ranges.TryFind with
+            | Some range -> 
+                let a,a' = (fst range.LowerRight),(snd range.LowerRight)
+                let b,b' = (fst range.UpperLeft), (snd range.UpperLeft)
+                printfn "a %d a' %d b %d b' %d upperLeft %A lowerRight %A" a a' b b' upperLeft lowerRight
+                //if true then
+                if a>=b && a'>=b' && 
+                   b>=upperLeft.Row && b'>=upperLeft.Col &&
+                   a-upperLeft.Row <= values.GetUpperBound(0) && a'-upperLeft.Col <= values.GetUpperBound(1) then 
+                       array2D [| for i in [b .. a] do 
+                                      yield [ for j in [b' .. a'] do 
+                                                  yield values.[i-upperLeft.Row,j-upperLeft.Col] ] |]
+                    |> Some
+                else None
+            | _ -> None             
 
-        member x.Cells () = cells
+        member x.Cells () = ()
         member x.Cells (a, b) = ()
         member x.Cells (rangeObj: obj) = ()
         member x.Cells (rangeName: string) = ()
