@@ -25,15 +25,11 @@
     type FileFullName (fileName) =
         member x.Value = System.IO.FileInfo(fileName).FullName
 
-    type Index = RowIndex*ColIndex
-    and RowIndex = int
-    and ColIndex = int
-    and Label    = string
 
     [<CustomEquality; CustomComparison>]
     type CellIndex = 
-    | Label of Label
-    | Index of Index
+    | Label of string
+    | Index of int*int
         static member ColumnLabel columnIndex =
             let rec loop dividend col = 
                 if dividend > 0 then
@@ -69,11 +65,16 @@
         member x.ToTuple : int*int = 
             match x with
             | Label x -> CellIndex.ConvertLabel x
-            | Index x -> (fst x), (snd x)
+            | Index (x,y) -> x, y
 
         member x.Row = x.ToTuple |> fst
 
         member x.Col = x.ToTuple |> snd
+
+        override x.ToString() = 
+            match x with 
+            | Label x -> x
+            | Index (x,y) -> sprintf "%s%d" (CellIndex.ColumnLabel y) (x + 1)
 
         override x.GetHashCode() = x.GetHashCode()
 
@@ -81,8 +82,8 @@
             match y with
             | :? CellIndex as y -> 
                 match y with
-                |  Label y as y' -> y'.ToTuple = x.ToTuple
-                |  Index y as y' -> y'.ToTuple = x.ToTuple
+                |  Label _ as y' -> y'.ToTuple = x.ToTuple
+                |  Index (z,z') -> (z,z') = x.ToTuple
             | _ -> invalidArg (sprintf "'%A'" y) "is not comparable to CellIndex."
 
         interface System.IComparable with
@@ -96,8 +97,7 @@
                        if a=a' && b=b' then 0
                        else if a>a' && b>b' then 1
                        else -1
-                  | Index y as y' -> 
-                       let (a,b) = y'.ToTuple
+                  | Index (a,b) -> 
                        let (a',b') = x.ToTuple
                        if a=a' && b=b' then 0
                        else if a>a' && b>b' then 1
@@ -108,10 +108,8 @@
     type CellContent =
     | StringTableIndex  of int
     | InlineString      of int
-    | InlineString2     of int
     | Decimal           of decimal
-    | Date              of System.DateTime
-    | Pending    
+    | Date              of System.DateTime    
     | Empty      
     and CellContentContext =
         { log                  : Pollux.Log.ILogger 
@@ -120,7 +118,6 @@
           colOffset            : int
           values               : CellContent [,] ref
           inlineString         : Dict<int,string> ref
-          inlineString2        : Dict<int,string> ref
           cellFormula          : Dict<int,string> ref
           extensionList        : Dict<int,string> ref
           unknownCellFormat    : Dict<int,string> ref }
@@ -130,7 +127,6 @@
         { isCellValueValid   : bool
           CellValue          : decimal
           InlineString       : int
-          InlineString2      : int
           CellFormula        : int
           ExtensionList      : int
           UnknownCellFormat  : int
@@ -169,25 +165,25 @@
     type Range =
         { mutable Name : string 
           DefinedName  : DefinedName option
-          UpperLeft    : Index
-          LowerRight   : Index
+          UpperLeft    : CellIndex
+          LowerRight   : CellIndex
           Values       : CellContent [,] }
     and StringRange = 
         { mutable Name : string 
           DefinedName  : DefinedName option
-          UpperLeft    : Index
-          LowerRight   : Index
+          UpperLeft    : CellIndex
+          LowerRight   : CellIndex
           Values       : string [,] }
     and DecimalRange = 
         { mutable Name : string 
           DefinedName  : DefinedName option
-          UpperLeft    : Index
-          LowerRight   : Index
+          UpperLeft    : CellIndex
+          LowerRight   : CellIndex
           Values       : decimal [,] }
     and DefinedName =
         { Name         : string
-          UpperLeft    : Index
-          LowerRight   : Index
+          UpperLeft    : CellIndex
+          LowerRight   : CellIndex
           SheetGuid    : System.Guid }
     
     // for backward compatibility

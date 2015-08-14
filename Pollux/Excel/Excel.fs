@@ -36,7 +36,6 @@
         let values = 
             Array2D.createBased<CellContent> 0 0 rowCapacity colCapacity CellContent.Empty            
         let inlineString      = Dict<int,string>()
-        let inlineString2     = Dict<int,string>()
         let cellFormula       = Dict<int,string>()
         let extensionList     = Dict<int,string>()
         let unknownCellFormat = Dict<int,string>()
@@ -56,7 +55,6 @@
               colOffset             = (snd upperLeft.ToTuple)
               values                = ref values
               inlineString          = ref inlineString
-              inlineString2         = ref inlineString2
               cellFormula           = ref cellFormula
               extensionList         = ref extensionList
               unknownCellFormat     = ref unknownCellFormat }            
@@ -68,7 +66,7 @@
                     let rec loop () =
                         async { let index = System.Threading.Interlocked.Increment(index')
                                 let! ctx,outerXml = x.Receive()
-                                do setCell3 ctx index outerXml
+                                do setCell ctx index outerXml
                                 return! loop () }
                     loop () )
             logInfo "%s" "LargeSheet : parsing cells ..."
@@ -109,10 +107,8 @@
         member x.RangeValues rangeName = 
             match rangeName |> ranges.TryFind with
             | Some range -> 
-                let a,a' = (fst range.LowerRight),(snd range.LowerRight)
-                let b,b' = (fst range.UpperLeft), (snd range.UpperLeft)
-                printfn "a %d a' %d b %d b' %d upperLeft %A lowerRight %A" a a' b b' upperLeft lowerRight
-                //if true then
+                let a,a' = range.LowerRight.Row,range.LowerRight.Col
+                let b,b' = range.UpperLeft.Row,range.UpperLeft.Col
                 if a>=b && a'>=b' && 
                    b>=upperLeft.Row && b'>=upperLeft.Col &&
                    a-upperLeft.Row <= values.GetUpperBound(0) && a'-upperLeft.Col <= values.GetUpperBound(1) then 
@@ -123,6 +119,12 @@
                 else None
             | _ -> None             
 
+        member x.Table (header : string) (data : string) = ()
+            // valid header, data ranges
+            //
+        member x.ForcedTable () = ()
+            // coerced header -> string, data -> decimal ranges
+            //
         member x.Cells () = ()
         member x.Cells (a, b) = ()
         member x.Cells (rangeObj: obj) = ()

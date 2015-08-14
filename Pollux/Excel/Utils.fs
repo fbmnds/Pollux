@@ -176,8 +176,8 @@ let getDefinedNames (log : Pollux.Log.ILogger) sheetGuid (fileName : string) =
         let name,upperLeft,lowerRight = parseDefinedNames x
         name,
         { Name       = name
-          UpperLeft  = upperLeft
-          LowerRight = lowerRight
+          UpperLeft  = CellIndex.Index(upperLeft)
+          LowerRight = CellIndex.Index(lowerRight)
           SheetGuid  = sheetGuid })                             
     |> Map.ofSeq
 
@@ -196,46 +196,7 @@ let fIsCellDateTimeFormat (cellFormats : Map<int,CellFormat>) cellDateTimeFormat
             |> not
         else false
 
-let setCell i x (log : #Pollux.Log.ILogger)
-    (inlineString: Dict<int,string> ref) (inlineString2: Dict<int,string> ref)
-    (cellFormula: Dict<int,string> ref ) (extensionList: Dict<int,string> ref) = 
-    let info = Pollux.Log.LogLevel.Info
-    let test name = 
-        let x' = (xd x).Root.Descendants() |> Seq.filter (fun x'' -> x''.Name.LocalName = name)
-        if x' |> Seq.isEmpty then "" else x' |> Seq.head |> fun x'' -> x''.Value
-    let test' (x': System.Xml.Linq.XAttribute) = if (isNull x' || isNull x'.Value) then "" else x'.Value
-    let xa s = test' ((xd x).Root.Attribute(xn s))
-    let test2 x (y: Dict<int,string>)  = 
-        let z = test x
-        if z = "" then -1 
-        else y.Add (i, z); i
-    let test3 (x: string) = if (xa x) = "" then -1 else x |> xa |> int
-    let cv, cvb =     
-        if "" = test "v" then -1M,false
-        else
-            try (test "v" |> decimal),true
-            with | _ -> 
-                log.LogLine info "setCell: ignoring invalid cell '%s'" x
-                -1M,false
-    let rR = xa "r"  |> CellIndex.ConvertLabel |> fst
-    let rC = xa "r"  |> CellIndex.ConvertLabel |> snd
-    ((rR,rC),
-        {   isCellValueValid   = cvb
-            CellValue          = cv
-            InlineString       = test2 "is" !inlineString
-            InlineString2      = if cvb |> not && (xa "s") = "6" then (!inlineString2).Add (i, (xa "r")) ; i else -1
-            CellFormula        = test2 "f" !cellFormula
-            ExtensionList      = test2 "extLst" !extensionList
-            UnknownCellFormat  = -1
-            CellMetadataIndex  = test3 "cm"
-            ShowPhonetic       = test3 "ph" 
-            ReferenceRow       = rR
-            ReferenceCol       = rC
-            StyleIndex         = test3 "s"  
-            CellDataType       = if (xa "t") = "" then ' ' else ((xa "t").ToCharArray()).[0]
-            ValueMetadataIndex = test3 "vm" })
-
-let setCell3 (ctx : CellContentContext) index outerXml = 
+let setCell (ctx : CellContentContext) index outerXml = 
     try
         let logInfo format = ctx.log.LogLine Pollux.Log.Info format
         let test name = 
@@ -257,11 +218,10 @@ let setCell3 (ctx : CellContentContext) index outerXml =
                     -1M,false
         let rR = xa "r"  |> CellIndex.ConvertLabel |> fst
         let rC = xa "r"  |> CellIndex.ConvertLabel |> snd
+        let is = if cvb |> not && (xa "s") = "6" then (!ctx.inlineString).Add (index, (xa "r")) ; index else test2 "is" !(ctx.inlineString)
         {   isCellValueValid   = cvb
             CellValue          = cv
-            //CellValueString    = 
-            InlineString       = test2 "is" !(ctx.inlineString)
-            InlineString2      = if cvb |> not && (xa "s") = "6" then (!ctx.inlineString2).Add (index, (xa "r")) ; index else -1 
+            InlineString       = is 
             CellFormula        = test2 "f" !(ctx.cellFormula)
             ExtensionList      = test2 "extLst" !(ctx.extensionList)
             UnknownCellFormat  = -1
@@ -280,8 +240,7 @@ let setCell3 (ctx : CellContentContext) index outerXml =
         match x with
         | Some x -> 
             let c =  
-                if x.InlineString2 > -1 then CellContent.InlineString2 x.InlineString2
-                else if x.InlineString > -1 then CellContent.InlineString x.InlineString
+                if x.InlineString > -1 then CellContent.InlineString x.InlineString
                 else if x.CellDataType = 's' then 
                     CellContent.StringTableIndex (int x.CellValue)
                 else if x.isCellValueValid then 

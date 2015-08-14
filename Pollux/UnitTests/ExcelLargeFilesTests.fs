@@ -135,8 +135,8 @@ module LargeFiles =
         let range' : Range = 
             {  Name = "Cost Summary2.xlsx : CheckSums"
                DefinedName = None
-               UpperLeft  = sheet2.UpperLeft.ToTuple
-               LowerRight = sheet2.LowerRight.ToTuple
+               UpperLeft  = sheet2.UpperLeft
+               LowerRight = sheet2.LowerRight
                Values = sheet2.Values }
         RangeWithCheckSumsRow (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
@@ -158,8 +158,8 @@ module LargeFiles =
         let range' : Range = 
             {  Name = "Cost Summary2.xlsx : CheckSums2"
                DefinedName = None
-               UpperLeft  = sheet3.UpperLeft.ToTuple
-               LowerRight = sheet3.LowerRight.ToTuple
+               UpperLeft  = sheet3.UpperLeft
+               LowerRight = sheet3.LowerRight
                Values = sheet3.Values }
         RangeWithCheckSumsRow (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
@@ -195,8 +195,8 @@ module LargeFiles =
         let range' : Range = 
             {  Name = "Cost Summary2.xlsx : CheckSums"
                DefinedName = None
-               UpperLeft  = sheet2.UpperLeft.ToTuple
-               LowerRight = sheet2.LowerRight.ToTuple
+               UpperLeft  = sheet2.UpperLeft
+               LowerRight = sheet2.LowerRight
                Values = sheet2.Values }
         RangeWithCheckSumsCol (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
@@ -227,12 +227,12 @@ module LargeFiles =
         let range' : Range = 
             {  Name = "Cost Summary2.xlsx : CheckSums2"
                DefinedName = None
-               UpperLeft  = sheet3.UpperLeft.ToTuple
-               LowerRight = sheet3.LowerRight.ToTuple
+               UpperLeft  = sheet3.UpperLeft
+               LowerRight = sheet3.LowerRight
                Values = sheet3.Values }
         let conversion (i: int) (j: int) x = 
             match x with
-            | StringTableIndex _ | InlineString _ | Pending | Empty -> 0M
+            | StringTableIndex _ | InlineString _ | Empty -> 0M
             | Decimal x -> x
             | Date x -> decimal (toJulianDate x)
         RangeWithCheckSumsCol (range', conversion)
