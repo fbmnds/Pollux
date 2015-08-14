@@ -101,7 +101,12 @@
         member x.UpperLeft = upperLeft
         member x.LowerRight = lowerRight
 
-        member x.Values = values            
+        member x.Values2 = values  
+        member x.Values ()            = fun i j -> values.[i,j]          
+        member x.InlineString ()      = fun i -> inlineString.[i]
+        member x.CellFormula ()       = fun i -> cellFormula.[i]
+        member x.ExtensionList ()     = fun i -> extensionList.[i]
+        member x.UnknownCellFormat () = fun i -> unknownCellFormat.[i]
 
         member x.Ranges = ranges
         member x.RangeValues rangeName = 

@@ -218,7 +218,10 @@ let setCell (ctx : CellContentContext) index outerXml =
                     -1M,false
         let rR = xa "r"  |> CellIndex.ConvertLabel |> fst
         let rC = xa "r"  |> CellIndex.ConvertLabel |> snd
-        let is = if cvb |> not && (xa "s") = "6" then (!ctx.inlineString).Add (index, (xa "r")) ; index else test2 "is" !(ctx.inlineString)
+        let is = 
+            if cvb |> not && (xa "s") = "6" 
+            then (!ctx.inlineString).Add (index, (xa "r")) ; index 
+            else test2 "is" !(ctx.inlineString)
         {   isCellValueValid   = cvb
             CellValue          = cv
             InlineString       = is 

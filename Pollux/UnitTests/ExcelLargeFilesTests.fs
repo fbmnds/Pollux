@@ -25,10 +25,10 @@ module LargeFiles =
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeFiles : file6000rows.xlsx : Values``() =
         let i',j' = sheetRandom.UpperLeft.ToTuple
-        [ for i in [0 .. sheetRandom.Values.GetUpperBound(0)] do
-              for j in [0 .. sheetRandom.Values.GetUpperBound(1)] do
-                  yield if sheetRandom.Values.[i,j] <> CellContent.Empty 
-                        then sprintf "%s %A\r\n" (convertIndex (i+i') (j+j')) sheetRandom.Values.[i,j]
+        [ for i in [0 .. sheetRandom.Values2.GetUpperBound(0)] do
+              for j in [0 .. sheetRandom.Values2.GetUpperBound(1)] do
+                  yield if sheetRandom.Values2.[i,j] <> CellContent.Empty 
+                        then sprintf "%s %A\r\n" (convertIndex (i+i') (j+j')) sheetRandom.Values2.[i,j]
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``file6000rows_1.txt``))
@@ -58,27 +58,27 @@ module LargeFiles =
 
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : GetUpperBound(0) : 1``() =
-        sheet.Values.GetUpperBound(0) |> should equal 32
+        sheet.Values2.GetUpperBound(0) |> should equal 32
 
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : GetUpperBound(0) : 2``() =
-        sheet2.Values.GetUpperBound(0) |> should equal 28
+        sheet2.Values2.GetUpperBound(0) |> should equal 28
 
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : GetUpperBound(0) : 3``() =
-        sheet3.Values.GetUpperBound(0) |> should equal 28
+        sheet3.Values2.GetUpperBound(0) |> should equal 28
 
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : GetUpperBound(1) : 1``() =
-        sheet.Values.GetUpperBound(1) |> should equal 7
+        sheet.Values2.GetUpperBound(1) |> should equal 7
 
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : GetUpperBound(1) : 2``() =
-        sheet2.Values.GetUpperBound(1) |> should equal 7
+        sheet2.Values2.GetUpperBound(1) |> should equal 7
 
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : GetUpperBound(1) : 3``() =
-        sheet3.Values.GetUpperBound(1) |> should equal 7
+        sheet3.Values2.GetUpperBound(1) |> should equal 7
 
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : LowerRight : 1``() =
@@ -95,10 +95,22 @@ module LargeFiles =
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : Values : 1``() =
         let i',j' = sheet.UpperLeft.ToTuple
-        [ for i in [0 .. sheet.Values.GetUpperBound(0)] do
-              for j in [0 .. sheet.Values.GetUpperBound(1)] do
-                  yield if sheet.Values.[i,j] <> CellContent.Empty 
-                        then sprintf "%s %A\r\n" (convertIndex (i+i') (j+j')) sheet.Values.[i,j]
+        let values = sheet.Values ()
+        [ for i in [0 .. sheet.Values2.GetUpperBound(0)] do
+              for j in [0 .. sheet.Values2.GetUpperBound(1)] do
+                  yield if (values i j) <> CellContent.Empty 
+                        then sprintf "%s %A\r\n" (convertIndex (i+i') (j+j')) sheet.Values2.[i,j]
+                        else "" ]
+        |> String.concat ""
+        |> should equal (System.IO.File.ReadAllText(``Cost Summary2_1.txt``))
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : Values2 : 1``() =
+        let i',j' = sheet.UpperLeft.ToTuple
+        [ for i in [0 .. sheet.Values2.GetUpperBound(0)] do
+              for j in [0 .. sheet.Values2.GetUpperBound(1)] do
+                  yield if sheet.Values2.[i,j] <> CellContent.Empty 
+                        then sprintf "%s %A\r\n" (convertIndex (i+i') (j+j')) sheet.Values2.[i,j]
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_1.txt``))
@@ -106,10 +118,22 @@ module LargeFiles =
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : Values : 2``() =
         let i2',j2' = sheet2.UpperLeft.ToTuple
-        [ for i in [0 .. sheet2.Values.GetUpperBound(0)] do
-              for j in [0 .. sheet2.Values.GetUpperBound(1)] do
-                  yield if sheet2.Values.[i,j] <> CellContent.Empty 
-                        then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) sheet2.Values.[i,j];
+        let values = sheet2.Values ()
+        [ for i in [0 .. sheet2.Values2.GetUpperBound(0)] do
+              for j in [0 .. sheet2.Values2.GetUpperBound(1)] do
+                  yield if sheet2.Values2.[i,j] <> CellContent.Empty 
+                        then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) (values i j);
+                        else "" ]
+        |> String.concat ""
+        |> should equal (System.IO.File.ReadAllText(``Cost Summary2_2.txt``))
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : Values2 : 2``() =
+        let i2',j2' = sheet2.UpperLeft.ToTuple
+        [ for i in [0 .. sheet2.Values2.GetUpperBound(0)] do
+              for j in [0 .. sheet2.Values2.GetUpperBound(1)] do
+                  yield if sheet2.Values2.[i,j] <> CellContent.Empty 
+                        then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) sheet2.Values2.[i,j];
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_2.txt``))
@@ -117,10 +141,22 @@ module LargeFiles =
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : Values : 3``() =
         let i3',j3' = sheet3.UpperLeft.ToTuple
-        [ for i in [0 .. sheet3.Values.GetUpperBound(0)] do
-              for j in [0 .. sheet3.Values.GetUpperBound(1)] do
-                  yield if sheet3.Values.[i,j] <> CellContent.Empty 
-                        then sprintf "%s %A\r\n" (convertIndex (i+i3') (j+j3')) sheet3.Values.[i,j];
+        let values = sheet3.Values ()
+        [ for i in [0 .. sheet3.Values2.GetUpperBound(0)] do
+              for j in [0 .. sheet3.Values2.GetUpperBound(1)] do
+                  yield if sheet3.Values2.[i,j] <> CellContent.Empty 
+                        then sprintf "%s %A\r\n" (convertIndex (i+i3') (j+j3')) (values i j);
+                        else "" ]
+        |> String.concat ""
+        |> should equal (System.IO.File.ReadAllText(``Cost Summary2_3.txt``))
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : Values2 : 3``() =
+        let i3',j3' = sheet3.UpperLeft.ToTuple
+        [ for i in [0 .. sheet3.Values2.GetUpperBound(0)] do
+              for j in [0 .. sheet3.Values2.GetUpperBound(1)] do
+                  yield if sheet3.Values2.[i,j] <> CellContent.Empty 
+                        then sprintf "%s %A\r\n" (convertIndex (i+i3') (j+j3')) sheet3.Values2.[i,j];
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_3.txt``))
@@ -137,7 +173,7 @@ module LargeFiles =
                DefinedName = None
                UpperLeft  = sheet2.UpperLeft
                LowerRight = sheet2.LowerRight
-               Values = sheet2.Values }
+               Values = sheet2.Values2 }
         RangeWithCheckSumsRow (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
         |> fun (x,y,z) -> 
@@ -160,7 +196,7 @@ module LargeFiles =
                DefinedName = None
                UpperLeft  = sheet3.UpperLeft
                LowerRight = sheet3.LowerRight
-               Values = sheet3.Values }
+               Values = sheet3.Values2 }
         RangeWithCheckSumsRow (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
         |> fun (x,y,z) -> 
@@ -197,7 +233,7 @@ module LargeFiles =
                DefinedName = None
                UpperLeft  = sheet2.UpperLeft
                LowerRight = sheet2.LowerRight
-               Values = sheet2.Values }
+               Values = sheet2.Values2 }
         RangeWithCheckSumsCol (range')
         |> fun x -> x.CheckSums, x.CheckResults, x.CheckErrors 
         |> fun (x,y,z) -> 
@@ -229,7 +265,7 @@ module LargeFiles =
                DefinedName = None
                UpperLeft  = sheet3.UpperLeft
                LowerRight = sheet3.LowerRight
-               Values = sheet3.Values }
+               Values = sheet3.Values2 }
         let conversion (i: int) (j: int) x = 
             match x with
             | StringTableIndex _ | InlineString _ | Empty -> 0M
