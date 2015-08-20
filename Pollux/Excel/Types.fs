@@ -105,7 +105,12 @@
               | _ -> invalidArg (sprintf "'%A'" y) "is not comparable to CellIndex."
         
 
-    type CellContent =
+    type CellData =
+    | String  of string
+    | Decimal of decimal
+    | Date    of System.DateTime    
+    | Empty
+    and CellContent =
     | StringTableIndex  of int
     | InlineString      of int
     | Decimal           of decimal

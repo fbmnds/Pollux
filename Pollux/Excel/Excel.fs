@@ -76,8 +76,8 @@
             while parseAgent.CurrentQueueLength > 0 do ()
             logInfo "%s" "LargeSheet : parsing cells done"            
 
-        //let sharedStringTable = workbookPart.SharedStringTablePart.SharedStringTable
-        //let sharedStringItems = sharedStringTable.Elements<SharedStringItem'>()
+        let sharedString = getSharedStrings log fileName
+
         let definedNames = getDefinedNames log sheetGuid fileName
 
         let ranges = getDefinedNames log sheetGuid fileName
@@ -102,11 +102,19 @@
         member x.LowerRight = lowerRight
 
         member x.Values2 = values  
-        member x.Values ()            = fun i j -> values.[i,j]          
+        member x.Values ()            = fun i j -> values.[i,j]     
+        member x.SharedStrings ()     = fun i -> sharedString.[i]     
         member x.InlineString ()      = fun i -> inlineString.[i]
         member x.CellFormula ()       = fun i -> cellFormula.[i]
         member x.ExtensionList ()     = fun i -> extensionList.[i]
         member x.UnknownCellFormat () = fun i -> unknownCellFormat.[i]
+        member x.Data () = fun i j ->
+            match values.[i,j] with
+            | StringTableIndex i -> CellData.String (sharedString.[i])
+            | InlineString i -> CellData.String (inlineString.[i])
+            | Date d -> CellData.Date (d)
+            | Decimal x -> CellData.Decimal (x)
+            | _ -> CellData.Empty
 
         member x.Ranges = ranges
         member x.RangeValues rangeName = 
@@ -123,6 +131,20 @@
                     |> Some
                 else None
             | _ -> None             
+        member x.RangeData rangeName = 
+            match rangeName |> ranges.TryFind with
+            | Some range -> 
+                let a,a' = range.LowerRight.Row,range.LowerRight.Col
+                let b,b' = range.UpperLeft.Row,range.UpperLeft.Col
+                if a>=b && a'>=b' && 
+                   b>=upperLeft.Row && b'>=upperLeft.Col &&
+                   a-upperLeft.Row <= values.GetUpperBound(0) && a'-upperLeft.Col <= values.GetUpperBound(1) then 
+                       array2D [| for i in [b .. a] do 
+                                      yield [ for j in [b' .. a'] do yield (x.Data() i j) ] |]
+                    |> Some
+                else None
+            | _ -> None    
+        member x.RangeDimensions rangeName = rangeName |> ranges.TryFind
 
         member x.Table (header : string) (data : string) = ()
             // valid header, data ranges

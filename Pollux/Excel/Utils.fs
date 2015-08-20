@@ -56,6 +56,13 @@ let inline fromJulianDate x =
 let inline toJulianDate (x : System.DateTime) =
     (x.ToBinary() - 599264352000000000L) / 864000000000L
 
+let inline Array2DColSum (x : 'T [,]) col = 
+    [ for row in [x.GetLowerBound(0) .. x.GetUpperBound(0)] do yield x.[row,col] ]
+    |> Seq.reduce (+)
+
+let inline Array2DRowSum (x : 'T [,]) row = 
+    [ for col in [x.GetLowerBound(1) .. x.GetUpperBound(1)] do yield x.[row,col] ]
+    |> Seq.reduce (+)
 
 let getDimensions (log : Pollux.Log.ILogger) (fileName : string) sheetName s = 
     try
@@ -154,6 +161,14 @@ let getCellFormats (log : Pollux.Log.ILogger) (fileName : string) =
           XfId              = xa x "xfId";
           ApplyNumberFormat = xa x "applyNumberFormat" })                             
     |> Map.ofSeq
+
+let getSharedStrings (log : Pollux.Log.ILogger) (fileName : string) =
+    let partUri = "/xl/sharedStrings.xml"
+    let xPath = "//*[name()='sst']/*[name()='si']"   
+    getPart log fileName xPath partUri id2
+    |> Seq.mapi (fun i x ->                 
+        i, test x "t")             // TODO: capture text in runs     
+    |> dict
 
 let parseDefinedNames (x: string) = 
     let errMsg = (sprintf "ERROR:unexpected 'definedName' format:VALUE:%s" x),(-1,-1),(-1,-1)
