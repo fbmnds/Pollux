@@ -11,30 +11,25 @@ open System.IO.Packaging
 
 #time;;
 fsi.AddPrinter(fun (x:XmlNode) -> x.OuterXml);;
-
 #load "Log.fs"
+#load "CellParser.fs"
 #load "Types.fs"
 #load "Utils.fs"
 #load "Range.fs"
 #load "Excel.fs"
-#load "CellParser.fs"
-#load "Excel2.fs"
 
-
-open Pollux.Log
 open Pollux.Excel
 open Pollux.Excel.Utils
 open Pollux.Excel.Range
-open Pollux.Excel.Cell.Parser
 
-let log = (new ConsoleLogger() :> ILogger)
+let log = new Pollux.Log.ConsoleLogger()
 
 
 let ``file6000rows.xlsx`` = __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows.xlsx"
 
-let ``Übersicht`` = 
-    __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2\xl\worksheets\sheet1.xml"
-    |> fun x -> System.IO.File.ReadAllText(x)
+//let ``Übersicht`` = 
+//    __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\Cost Summary2\xl\worksheets\sheet1.xml"
+//    |> fun x -> System.IO.File.ReadAllText(x)
 
 //let ``Random`` =
 //    __SOURCE_DIRECTORY__ + @"..\..\UnitTests\data\file6000rows\xl\worksheets\sheet1.xml"
@@ -54,10 +49,10 @@ let sheet3 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums2", false)
 
 do
     let i2',j2' = sheet2.UpperLeft.ToTuple
-    [ for i in [0 .. sheet2.Values.GetUpperBound(0)] do
-            for j in [0 .. sheet2.Values.GetUpperBound(1)] do
-                yield if sheet2.Values.[i,j] <> CellContent.Empty 
-                    then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) sheet2.Values.[i,j];
+    [ for i in [0 .. (sheet2.LowerRight.Row - sheet2.UpperLeft.Row)] do
+            for j in [0 .. (sheet2.LowerRight.Col - sheet2.UpperLeft.Col)] do
+                yield if (sheet2.Values()) i j <> CellContent.Empty 
+                    then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) ((sheet2.Values()) i j)
                     else "" ]
     |> String.concat ""
     |> printfn "%s"

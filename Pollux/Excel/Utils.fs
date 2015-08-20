@@ -122,7 +122,8 @@ let getSheetId (log : Pollux.Log.ILogger) (fileName : string) (sheetName : strin
     getPart (log : Pollux.Log.ILogger) fileName xPath partUri id2
     |> Seq.head
     |> fun x -> 
-        (xd x).Root.Attribute(xn "sheetId").Value
+        x.Replace(" r:id=", " rId=") 
+        |> fun x -> (xd x).Root.Attribute(xn @"rId").Value.Substring(3)
 
 let getNumberFormats (log : Pollux.Log.ILogger) (fileName : string) = 
     log.LogLine Pollux.Log.LogLevel.Info
