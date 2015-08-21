@@ -43,7 +43,10 @@ module LargeFiles =
     let sheet2 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums", false)
     let sheet3 = LargeSheet (``Cost Summary2.xlsx``, "CheckSums2", false)
 
-        
+    let ``Ranges_1.txt`` = __SOURCE_DIRECTORY__ + @"\data\Ranges_1.txt"
+    let ``Ranges.xlsx``  = __SOURCE_DIRECTORY__ + @"\data\Ranges.xlsx"
+    let sheet4 = LargeSheet (``Ranges.xlsx``, "Standard", false)
+            
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : UpperLeft : 1``() =
         sheet.UpperLeft |> should equal (Index(0,0))
@@ -55,6 +58,10 @@ module LargeFiles =
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : UpperLeft : 3``() =
         sheet3.UpperLeft |> should equal (Index(0,1))
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : UpperLeft : 4``() =
+        sheet4.UpperLeft |> should equal (Index(1,1))
 
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : GetUpperBound(0) : 1``() =
@@ -93,13 +100,17 @@ module LargeFiles =
         sheet3.LowerRight |> should equal (Index(28,8))
 
     [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : LowerRight : 4``() =
+        sheet4.LowerRight |> should equal (Index(30,8))
+
+    [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : Values : 1``() =
         let i',j' = sheet.UpperLeft.ToTuple
         let values = sheet.Values ()
-        [ for i in [0 .. sheet.Values2.GetUpperBound(0)] do
-              for j in [0 .. sheet.Values2.GetUpperBound(1)] do
+        [ for i in [0 .. sheet.LowerRight.Row-sheet.UpperLeft.Row] do
+              for j in [0 .. sheet.LowerRight.Col-sheet.UpperLeft.Col] do
                   yield if (values i j) <> CellContent.Empty 
-                        then sprintf "%s %A\r\n" (convertIndex (i+i') (j+j')) sheet.Values2.[i,j]
+                        then sprintf "%s %A\r\n" (convertIndex (i+i') (j+j')) (values i j)
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_1.txt``))
@@ -119,10 +130,10 @@ module LargeFiles =
     let ``Excel : LargeSheet : Values : 2``() =
         let i2',j2' = sheet2.UpperLeft.ToTuple
         let values = sheet2.Values ()
-        [ for i in [0 .. sheet2.Values2.GetUpperBound(0)] do
-              for j in [0 .. sheet2.Values2.GetUpperBound(1)] do
+        [ for i in [0 .. sheet2.LowerRight.Row-sheet2.UpperLeft.Row] do
+              for j in [0 .. sheet2.LowerRight.Col-sheet2.UpperLeft.Col] do
                   yield if sheet2.Values2.[i,j] <> CellContent.Empty 
-                        then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) (values i j);
+                        then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) (values i j)
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_2.txt``))
@@ -133,7 +144,7 @@ module LargeFiles =
         [ for i in [0 .. sheet2.Values2.GetUpperBound(0)] do
               for j in [0 .. sheet2.Values2.GetUpperBound(1)] do
                   yield if sheet2.Values2.[i,j] <> CellContent.Empty 
-                        then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) sheet2.Values2.[i,j];
+                        then sprintf "%s %A\r\n" (convertIndex (i+i2') (j+j2')) sheet2.Values2.[i,j]
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_2.txt``))
@@ -142,10 +153,10 @@ module LargeFiles =
     let ``Excel : LargeSheet : Values : 3``() =
         let i3',j3' = sheet3.UpperLeft.ToTuple
         let values = sheet3.Values ()
-        [ for i in [0 .. sheet3.Values2.GetUpperBound(0)] do
-              for j in [0 .. sheet3.Values2.GetUpperBound(1)] do
+        [ for i in [0 .. sheet3.LowerRight.Row-sheet3.UpperLeft.Row] do
+              for j in [0 .. sheet3.LowerRight.Col-sheet3.UpperLeft.Col] do
                   yield if sheet3.Values2.[i,j] <> CellContent.Empty 
-                        then sprintf "%s %A\r\n" (convertIndex (i+i3') (j+j3')) (values i j);
+                        then sprintf "%s %A\r\n" (convertIndex (i+i3') (j+j3')) (values i j)
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_3.txt``))
@@ -156,10 +167,21 @@ module LargeFiles =
         [ for i in [0 .. sheet3.Values2.GetUpperBound(0)] do
               for j in [0 .. sheet3.Values2.GetUpperBound(1)] do
                   yield if sheet3.Values2.[i,j] <> CellContent.Empty 
-                        then sprintf "%s %A\r\n" (convertIndex (i+i3') (j+j3')) sheet3.Values2.[i,j];
+                        then sprintf "%s %A\r\n" (convertIndex (i+i3') (j+j3')) sheet3.Values2.[i,j]
                         else "" ]
         |> String.concat ""
         |> should equal (System.IO.File.ReadAllText(``Cost Summary2_3.txt``))
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : Values2 : 4``() =
+        let i3',j3' = sheet4.UpperLeft.ToTuple
+        [ for i in [0 .. sheet4.Values2.GetUpperBound(0)] do
+              for j in [0 .. sheet4.Values2.GetUpperBound(1)] do
+                  yield if sheet4.Values2.[i,j] <> CellContent.Empty 
+                        then sprintf "%s %A\r\n" (convertIndex (i+i3') (j+j3')) sheet4.Values2.[i,j]
+                        else "" ]
+        |> String.concat ""
+        |> should equal (System.IO.File.ReadAllText(``Ranges_1.txt``))
 
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : RangeWithCheckSumsRow : Values : 1``() =
@@ -181,8 +203,6 @@ module LargeFiles =
             should equal results y,
             should equal errors z
         |> ignore
-
-
 
     [<Test; Category "Pollux.Excel">]
     let ``Excel : LargeSheet : RangeWithCheckSumsRow : Values : 2``() =
@@ -278,3 +298,106 @@ module LargeFiles =
             should equal results y,
             should equal errors z
         |> ignore
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : RangeDimensions : 1``() =
+        let dataDim = 
+            match sheet4.RangeDimensions "data" with | Some x -> x | _ -> failwith "cannot access range 'data'"
+        (dataDim.UpperLeft.ToTuple, dataDim.LowerRight.ToTuple)
+        |> should equal ((2,1),(29,8))
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : Ranges.xlsx : header``() =
+        let dataDim = 
+            match sheet4.RangeDimensions "data" with | Some x -> x | _ -> failwith "cannot access range 'data'"
+        let header = 
+            [| for i in [0 .. dataDim.LowerRight.Col-dataDim.UpperLeft.Col] do 
+                yield CellIndex.ColumnLabel (dataDim.UpperLeft.Col+i) |]
+        header.[0] <- "UnitID"
+        header.[1] <- "Name"
+        header
+        |> should equal [| "UnitID"; "Name"; "D"; "E"; "F"; "G"; "H"; "I" |]
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : Ranges.xlsx : data``() =
+        let dataDim = 
+            match sheet4.RangeDimensions "data" with 
+            | Some x -> x | _ -> failwith "cannot access range 'data'"
+        let header = 
+            [| for i in [0 .. dataDim.LowerRight.Col-dataDim.UpperLeft.Col] do 
+                yield CellIndex.ColumnLabel (dataDim.UpperLeft.Col+i) |]
+        header.[0] <- "UnitID"
+        header.[1] <- "Name"
+        let data = Dict<string,decimal[]>()
+        header
+        |> Array.iteri (fun i x -> 
+            if i > 1 then
+                let col = i
+                data.[header.[i]] <- 
+                    let r1 = dataDim.UpperLeft.Row - sheet4.UpperLeft.Row
+                    let r2 = dataDim.LowerRight.Row - sheet4.UpperLeft.Row
+                    [| for row in [r1 .. r2] do
+                           yield                                
+                               match sheet4.Values2.[row,col] with 
+                               | Decimal x -> x | _ -> 0M |])
+        [| data.["D"].[0]; data.["I"].[27] |]
+        |> should (equalWithin 0.01) [| 506.40M; 9244995.87M |]
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : Ranges.xlsx : checksums : 1``() =
+        let checksumsDim = 
+            match sheet4.RangeDimensions "checksums" with 
+            | Some x -> x | _ -> failwith "cannot access range 'checksums'"
+        let checksums = Dict<string,decimal>()
+        [| for i in [0 .. checksumsDim.LowerRight.Col-checksumsDim.UpperLeft.Col] do 
+            yield i,CellIndex.ColumnLabel (checksumsDim.UpperLeft.Col+i) |]
+        |> Array.iter (fun (col,x) -> 
+            checksums.[x] <- 
+                let r = checksumsDim.UpperLeft.Row-sheet4.UpperLeft.Row
+                let c = checksumsDim.UpperLeft.Col-sheet4.UpperLeft.Col
+                match sheet4.Values2.[r,col+c] with 
+                | Decimal x -> x | _ -> 0M)
+        [| checksums.["D"]; checksums.["E"]; checksums.["F"]; checksums.["G"]; checksums.["H"]; checksums.["I"] |]
+        |> should (equalWithin 0.01) [| 11141.36; 1597697566.20; 12.49; 13.19; 14.94; 1597708748.18 |]   
+
+    [<Test; Category "Pollux.Excel">]
+    let ``Excel : LargeSheet : Ranges.xlsx : checksums : 2``() =
+        let checksumsDim = 
+            match sheet4.RangeDimensions "checksums" with 
+            | Some x -> x | _ -> failwith "cannot access range 'checksums'"
+        let checksums = Dict<string,decimal>()
+        [| for i in [0 .. checksumsDim.LowerRight.Col-checksumsDim.UpperLeft.Col] do 
+            yield i,CellIndex.ColumnLabel (checksumsDim.UpperLeft.Col+i) |]
+        |> Array.iter (fun (col,x) -> 
+            checksums.[x] <- 
+                let r = checksumsDim.UpperLeft.Row-sheet4.UpperLeft.Row
+                let c = checksumsDim.UpperLeft.Col-sheet4.UpperLeft.Col
+                match sheet4.Values2.[r,col+c] with 
+                | Decimal x -> x | _ -> 0M)
+        let dataDim = 
+            match sheet4.RangeDimensions "data" with 
+            | Some x -> x | _ -> failwith "cannot access range 'data'"
+        let header = 
+            [| for i in [0 .. dataDim.LowerRight.Col-dataDim.UpperLeft.Col] do 
+                yield CellIndex.ColumnLabel (dataDim.UpperLeft.Col+i) |]
+        header.[0] <- "UnitID"
+        header.[1] <- "Name"
+        let data = Dict<string,decimal[]>()
+        header
+        |> Array.iteri (fun i x -> 
+            if i > 1 then
+                let col = i
+                data.[header.[i]] <- 
+                    let r1 = dataDim.UpperLeft.Row - sheet4.UpperLeft.Row
+                    let r2 = dataDim.LowerRight.Row - sheet4.UpperLeft.Row
+                    [| for row in [r1 .. r2] do
+                           yield                                
+                               match sheet4.Values2.[row,col] with 
+                               | Decimal x -> x | _ -> 0M |])
+        let datasums = Dict<string,decimal>()
+        header
+        |> Array.iteri (fun i x -> 
+            if i > 1 then
+                datasums.[x] <- data.[x] |> Array.reduce (+))
+        datasums
+        |> should (equalWithin 0.01) checksums
