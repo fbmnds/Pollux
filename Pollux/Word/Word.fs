@@ -92,6 +92,14 @@ module Word =
         doc
 
 
+    let ReplaceInFooter (pattern : string) replacement (doc : Docx) =
+        doc.Content.MainDocumentPart.FooterParts
+        |> Seq.iter (fun footer ->
+            let xml : string = footer.RootElement.InnerXml
+            footer.RootElement.InnerXml <- xml.Replace(pattern, replacement))
+        doc
+
+
     let ReplaceInText pattern replacement (doc : Docx) =
         let body = doc.Content.MainDocumentPart.Document.Body
         for para in body.Elements<Paragraph>() do
@@ -99,6 +107,25 @@ module Word =
                 for text in run.Elements<Text>() do
                     if text.Text.Contains(pattern) then
                         text.Text <- text.Text.Replace(pattern, replacement)
+        doc
+
+
+    let ReplaceInText2 pattern replacement (doc : Docx) =
+        for text in doc.Content.MainDocumentPart.Document.Descendants<Text>() |> Seq.windowed 2 do
+            let text' = Text(text.[0].InnerText + text.[1].InnerText)
+            if text'.Text.Contains(pattern) then
+                text.[0].Text <- text'.Text.Replace(pattern, replacement)
+                text.[1].Text <- ""
+        doc
+
+
+    let ReplaceInText3 pattern replacement (doc : Docx) =
+        for text in doc.Content.MainDocumentPart.Document.Descendants<Text>() |> Seq.windowed 3 do
+            let text' = Text(text.[0].InnerText + text.[1].InnerText + text.[2].InnerText)
+            if text'.Text.Contains(pattern) then
+                text.[0].Text <- text'.Text.Replace(pattern, replacement)
+                text.[1].Text <- ""
+                text.[2].Text <- ""
         doc
 
 
@@ -233,6 +260,16 @@ module Word =
         doc.Content.MainDocumentPart.Document.Save()
         doc.Content.Close()
 
+    let Close (doc : Docx) =
+        doc.Content.Close()
+
+    let ReadFunc func (fileName : string) =
+        let doc = 
+            fileName
+            |> OpenDoc false
+        let result = doc |> func
+        doc.Content.Dispose()
+        result
 
     let Merge (file1 : string) file2 =
         use doc = DocumentFormat.OpenXml.Packaging.WordprocessingDocument.Open(file1, true)
