@@ -1,4 +1,7 @@
 ## Pollux
+
+[![Build status](https://ci.appveyor.com/api/projects/status/ubu5nvajdu7njlva)](https://ci.appveyor.com/project/fbmnds/pollux)
+
 Large Excel test file:
 - ~130 MB on disk 
 - 2 sheets à ~6000x500 cells/450 MB
